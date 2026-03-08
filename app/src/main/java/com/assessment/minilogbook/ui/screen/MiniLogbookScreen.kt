@@ -14,13 +14,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,6 +33,7 @@ import com.assessment.minilogbook.ui.components.StatusValueCard
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -263,6 +262,7 @@ private fun HistorySection(
             val isDismissed by remember {
                 derivedStateOf { dismissState.currentValue == SwipeToDismissBoxValue.EndToStart }
             }
+            val coroutineScope = rememberCoroutineScope()
 
             LaunchedEffect(dismissState) {
                 snapshotFlow { dismissState.currentValue }
@@ -308,7 +308,13 @@ private fun HistorySection(
                     value = convertedValue,
                     unit = unit,
                     timestamp = entry.timestamp,
-                    onDelete = { onDeleteRequest(entry to dismissState::reset) }
+                    onDelete = {
+                        // Programmatically trigger the same slide-out animation as a real swipe.
+                        // The snapshotFlow observer picks up EndToStart and shows the snackbar.
+                        coroutineScope.launch {
+                            dismissState.dismiss(SwipeToDismissBoxValue.EndToStart)
+                        }
+                    }
                 )
             }
         }
