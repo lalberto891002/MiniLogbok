@@ -1,7 +1,9 @@
 package com.assessment.minilogbook.data
 
+import android.content.Context
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 enum class GlucoseUnit {
     MMOL_L, MG_DL
@@ -37,13 +39,22 @@ abstract class GlucoseDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: GlucoseDatabase? = null
 
-        fun getDatabase(context: android.content.Context): GlucoseDatabase {
+        fun getDatabase(context: Context): GlucoseDatabase {
             return INSTANCE ?: synchronized(this) {
+                // Load the SQLCipher native libraries before building the database
+                System.loadLibrary("sqlcipher")
+
+                val passphrase = PassphraseManager.getOrCreatePassphrase(context)
+                val factory = SupportOpenHelperFactory(passphrase)
+
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     GlucoseDatabase::class.java,
                     "glucose_database"
-                ).build()
+                )
+                    .openHelperFactory(factory)
+                    .build()
+
                 INSTANCE = instance
                 instance
             }

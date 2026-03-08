@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -43,11 +44,16 @@ class GlucoseDaoTest(
 
     @Before
     fun createDb() {
+        System.loadLibrary("sqlcipher")
         val context = ApplicationProvider.getApplicationContext<Context>()
+        // Empty passphrase is fine for in-memory test databases
+        val factory = SupportOpenHelperFactory(ByteArray(0))
         db = Room.inMemoryDatabaseBuilder(
             context,
             GlucoseDatabase::class.java
-        ).build()
+        )
+            .openHelperFactory(factory)
+            .build()
         glucoseDao = db.glucoseDao()
     }
 
