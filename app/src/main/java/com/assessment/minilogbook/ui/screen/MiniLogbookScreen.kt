@@ -17,14 +17,15 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.ui.components.StatusValueCard
 import com.assessment.minilogbook.ui.components.EntryItem
 import com.assessment.minilogbook.ui.components.GlucoseInputField
+import com.assessment.minilogbook.ui.components.GlucoseUnitSelector
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import java.util.*
@@ -123,29 +124,11 @@ private fun InputSection(
     focusManager: FocusManager
 ) {
     // Unit Selector
-    SingleChoiceSegmentedButtonRow(
+    GlucoseUnitSelector(
+        selectedUnit = state.unit,
+        onUnitSelected = { viewModel.onUnitChanged(it) },
         modifier = Modifier.fillMaxWidth()
-    ) {
-        GlucoseUnit.entries.forEachIndexed { index, unit ->
-            SegmentedButton(
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = GlucoseUnit.entries.size),
-                onClick = { viewModel.onUnitChanged(unit) },
-                selected = state.unit == unit,
-                colors = SegmentedButtonDefaults.colors(
-                    // Selected state: green background with white text
-                    activeContainerColor = MaterialTheme.colorScheme.primary,
-                    activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                    activeBorderColor = MaterialTheme.colorScheme.primary,
-                    // Unselected state: transparent background with green text
-                    inactiveContainerColor = MaterialTheme.colorScheme.surface,
-                    inactiveContentColor = MaterialTheme.colorScheme.primary,
-                    inactiveBorderColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl))
-            }
-        }
-    }
+    )
 
     // Input Field
     GlucoseInputField(
@@ -176,34 +159,16 @@ private fun InputSection(
 
 @Composable
 private fun SummarySection(average: Double, unit: GlucoseUnit, viewModel: GlucoseViewModel) {
-    // Current state only stores entries in Mmol, so we need to convert average back or calculate status from internal state
-    // For simplicity, we calculate status using Mmol average
     val avgInMmol = if (unit == GlucoseUnit.MG_DL) average / 18.0182 else average
     val status = viewModel.getGlucoseStatus(avgInMmol)
-    val statusColor = getColorForStatus(status)
+    val unitLabel = if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)
 
-    Card(
+    StatusValueCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = statusColor.copy(alpha = 0.15f)),
-        border = androidx.compose.foundation.BorderStroke(2.dp, statusColor)
-    ) {
-        Column(
-            modifier = Modifier.padding(dimensionResource(R.dimen.padding_medium)),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                stringResource(R.string.label_average_bg),
-                style = MaterialTheme.typography.titleMedium,
-                color = statusColor
-            )
-            Text(
-                text = "${String.format(Locale.getDefault(), "%.2f", average)} ${if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)}",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = statusColor
-            )
-        }
-    }
+        label = stringResource(R.string.label_average_bg),
+        value = "${String.format(Locale.getDefault(), "%.2f", average)} $unitLabel",
+        color = getColorForStatus(status)
+    )
 }
 
 @Composable
