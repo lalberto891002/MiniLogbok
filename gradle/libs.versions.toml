@@ -14,8 +14,8 @@ koin = "4.1.1"
 mockito = "5.22.0"
 mockitoKotlin = "6.2.3"
 kotlinxCoroutinesTest = "1.10.2"
-sqlcipher = "4.5.4"
-securityCrypto = "1.1.0-alpha06"
+sqlcipher = "4.13.0"
+securityCrypto = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

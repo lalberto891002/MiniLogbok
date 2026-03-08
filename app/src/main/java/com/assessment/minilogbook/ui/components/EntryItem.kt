@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -53,7 +54,7 @@ fun EntryItem(
     }
 
     Card(
-        modifier = modifier,
+        modifier = modifier.testTag("entry_$formattedValue"),
         elevation = CardDefaults.cardElevation(defaultElevation = dimensionResource(R.dimen.card_elevation)),
         colors = CardDefaults.cardColors(
             containerColor = statusColor.copy(alpha = 0.1f) // Light background based on status
