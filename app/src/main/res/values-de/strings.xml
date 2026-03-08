@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Mini-Logbuch</string>
+    <string name="title_mini_logbook">Mini-Logbuch</string>
+    <string name="label_enter_bg_value">Blutzuckerwert eingeben</string>
+    <string name="action_save">Speichern</string>
+    <string name="label_average_bg">Durchschnittlicher Blutzucker</string>
+    <string name="label_previous_entries">Bisherige Einträge</string>
+    <string name="unit_mmol_l">mmol/L</string>
+    <string name="unit_mg_dl">mg/dL</string>
+    <string name="error_invalid_value">Bitte geben Sie einen gültigen Wert >= 0 ein</string>
+</resources>
+

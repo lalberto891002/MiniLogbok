@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Mini Registro</string>
+    <string name="title_mini_logbook">Mini Registro</string>
+    <string name="label_enter_bg_value">Ingrese valor de glucosa</string>
+    <string name="action_save">Guardar</string>
+    <string name="label_average_bg">Promedio de glucosa en sangre</string>
+    <string name="label_previous_entries">Registros anteriores</string>
+    <string name="unit_mmol_l">mmol/L</string>
+    <string name="unit_mg_dl">mg/dL</string>
+    <string name="error_invalid_value">Por favor ingrese un valor válido >= 0</string>
+</resources>
+

@@ -1,3 +1,11 @@
 <resources>
-    <string name="app_name">MiniLogbook</string>
+    <string name="app_name">Mini Logbook</string>
+    <string name="title_mini_logbook">Mini Logbook</string>
+    <string name="label_enter_bg_value">Enter BG Value</string>
+    <string name="action_save">Save</string>
+    <string name="label_average_bg">Average Blood Glucose</string>
+    <string name="label_previous_entries">Previous Entries</string>
+    <string name="unit_mmol_l">mmol/L</string>
+    <string name="unit_mg_dl">mg/dL</string>
+    <string name="error_invalid_value">Please enter a valid value >= 0</string>
 </resources>

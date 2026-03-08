@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Standard spacing and padding -->
+    <dimen name="padding_small">8.dp</dimen>
+    <dimen name="padding_medium">16.dp</dimen>
+    <dimen name="padding_large">24.dp</dimen>
+
+    <!-- Specific component dimensions -->
+    <dimen name="card_elevation">2.dp</dimen>
+
+    <!-- Text sizes -->
+    <dimen name="text_unit_display">18.sp</dimen>
+</resources>
+

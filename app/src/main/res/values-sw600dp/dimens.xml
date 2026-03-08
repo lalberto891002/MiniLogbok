@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Optimized spacing for larger screens (Tablets) -->
+    <dimen name="padding_small">12.dp</dimen>
+    <dimen name="padding_medium">24.dp</dimen>
+    <dimen name="padding_large">32.dp</dimen>
+
+    <!-- Component specific dimensions for tablets -->
+    <dimen name="card_elevation">4.dp</dimen>
+
+    <!-- Larger text visibility -->
+    <dimen name="text_unit_display">22.sp</dimen>
+</resources>
+

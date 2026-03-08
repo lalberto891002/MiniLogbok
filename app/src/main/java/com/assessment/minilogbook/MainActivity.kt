@@ -11,37 +11,32 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.assessment.minilogbook.data.GlucoseDatabase
+import com.assessment.minilogbook.ui.screen.MiniLogbookScreen
 import com.assessment.minilogbook.ui.theme.MiniLogbookTheme
+import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val database = GlucoseDatabase.getDatabase(this)
+        val viewModelFactory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return GlucoseViewModel(database.glucoseDao()) as T
+            }
+        }
+
         enableEdgeToEdge()
         setContent {
             MiniLogbookTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                val viewModel: GlucoseViewModel = viewModel(factory = viewModelFactory)
+                MiniLogbookScreen(viewModel = viewModel)
             }
         }
     }
 }
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MiniLogbookTheme {
-        Greeting("Android")
-    }
-}
