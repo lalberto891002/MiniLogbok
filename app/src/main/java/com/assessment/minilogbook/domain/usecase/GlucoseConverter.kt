@@ -1,6 +1,7 @@
 package com.assessment.minilogbook.domain.usecase
 
 import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import java.util.Locale
 import kotlin.math.round
 
@@ -97,6 +98,37 @@ class GlucoseConverter {
         return value?.takeIf { validateValue(it) }?.let {
             toMmol(it, currentUnit)
         }
+    }
+
+    /**
+     * Determines the status of a glucose reading based on typical target ranges.
+     * - Target (Green): 90 - 140 mg/dL
+     * - Ok (Orange): 70-90 or 140-180 mg/dL
+     * - Out of range (Red): <70 or >180 mg/dL
+     *
+     * @param valueInMmol The glucose value in mmol/L.
+     * @return The corresponding [BloodGlucoseStatus].
+     */
+    fun getGlucoseStatus(valueInMmol: Double): BloodGlucoseStatus {
+        val valueInMgDl = valueInMmol * CONVERSION_FACTOR
+        return when {
+            valueInMgDl < 70.0 || valueInMgDl > 180.0 -> BloodGlucoseStatus.OUT_OF_RANGE
+            valueInMgDl < 90.0 || valueInMgDl > 140.0 -> BloodGlucoseStatus.OK
+            else -> BloodGlucoseStatus.IN_TARGET
+        }
+    }
+
+    /**
+     * Determines the status of a glucose reading based on typical target ranges,
+     * considering any unit provided.
+     *
+     * @param value The glucose value.
+     * @param unit The unit of the value (mmol/L or mg/dL).
+     * @return The corresponding [BloodGlucoseStatus].
+     */
+    fun getGlucoseStatusByUnit(value: Double, unit: GlucoseUnit): BloodGlucoseStatus {
+        val valueInMmol = toMmol(value, unit)
+        return getGlucoseStatus(valueInMmol)
     }
 
     private fun roundToFourDecimals(value: Double): Double {

@@ -1,6 +1,7 @@
 package com.assessment.minilogbook.domain.usecase
 
 import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -85,5 +86,58 @@ class GlucoseConverterTest {
         val value = 100.0
         assertEquals(value, converter.convertValue(value, GlucoseUnit.MG_DL, GlucoseUnit.MG_DL), epsilon)
         assertEquals(value, converter.convertValue(value, GlucoseUnit.MMOL_L, GlucoseUnit.MMOL_L), epsilon)
+    }
+
+    @Test
+    fun `getGlucoseStatus returns IN_TARGET for values within range`() {
+        // Target: 90 - 140 mg/dL. 100 mg/dL is ~5.55 mmol/L
+        val valueMmol = 100.0 / GlucoseConverter.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.IN_TARGET, converter.getGlucoseStatus(valueMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OK for marginal values`() {
+        // Ok: 160 mg/dL is ~8.88 mmol/L
+        val valueMmolHigh = 160.0 / GlucoseConverter.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, converter.getGlucoseStatus(valueMmolHigh))
+
+        // Ok: 80 mg/dL is ~4.44 mmol/L
+        val valueMmolLow = 80.0 / GlucoseConverter.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, converter.getGlucoseStatus(valueMmolLow))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OUT_OF_RANGE for critical values`() {
+        // Critical: 200 mg/dL is ~11.1 mmol/L
+        val valueMmolHigh = 200.0 / GlucoseConverter.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, converter.getGlucoseStatus(valueMmolHigh))
+
+        // Critical: 60 mg/dL is ~3.33 mmol/L
+        val valueMmolLow = 60.0 / GlucoseConverter.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, converter.getGlucoseStatus(valueMmolLow))
+    }
+
+    @Test
+    fun `getGlucoseStatusByUnit correctly assesses status for both units`() {
+        // Test Target range (90-140 mg/dL)
+        val targetMgDl = 100.0
+        val targetMmol = 100.0 / GlucoseConverter.CONVERSION_FACTOR
+        
+        assertEquals(BloodGlucoseStatus.IN_TARGET, converter.getGlucoseStatusByUnit(targetMgDl, GlucoseUnit.MG_DL))
+        assertEquals(BloodGlucoseStatus.IN_TARGET, converter.getGlucoseStatusByUnit(targetMmol, GlucoseUnit.MMOL_L))
+
+        // Test OK range (70-90 or 140-180 mg/dL)
+        val okMgDl = 160.0
+        val okMmol = 160.0 / GlucoseConverter.CONVERSION_FACTOR
+
+        assertEquals(BloodGlucoseStatus.OK, converter.getGlucoseStatusByUnit(okMgDl, GlucoseUnit.MG_DL))
+        assertEquals(BloodGlucoseStatus.OK, converter.getGlucoseStatusByUnit(okMmol, GlucoseUnit.MMOL_L))
+
+        // Test OUT_OF_RANGE range (<70 or >180 mg/dL)
+        val outMgDl = 200.0
+        val outMmol = 200.0 / GlucoseConverter.CONVERSION_FACTOR
+
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, converter.getGlucoseStatusByUnit(outMgDl, GlucoseUnit.MG_DL))
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, converter.getGlucoseStatusByUnit(outMmol, GlucoseUnit.MMOL_L))
     }
 }

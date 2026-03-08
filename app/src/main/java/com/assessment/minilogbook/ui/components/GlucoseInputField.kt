@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,7 +61,9 @@ fun GlucoseInputField(
         Text(
             text = unitText,
             fontSize = dimensionResource(R.dimen.text_unit_display).value.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            // Uses primary color (green in light, light green in dark) for visual consistency
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }

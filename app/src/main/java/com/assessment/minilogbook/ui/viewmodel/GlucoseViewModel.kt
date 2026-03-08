@@ -5,8 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.domain.usecase.GlucoseConverter
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class GlucoseState(
@@ -69,5 +75,9 @@ class GlucoseViewModel(
 
     fun convertValue(valueInMmol: Double, toUnit: GlucoseUnit): Double {
         return converter.fromMmol(valueInMmol, toUnit)
+    }
+
+    fun getGlucoseStatus(valueInMmol: Double): BloodGlucoseStatus {
+        return converter.getGlucoseStatus(valueInMmol)
     }
 }

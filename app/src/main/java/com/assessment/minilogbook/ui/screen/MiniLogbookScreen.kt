@@ -24,6 +24,7 @@ import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
 import com.assessment.minilogbook.ui.components.EntryItem
 import com.assessment.minilogbook.ui.components.GlucoseInputField
+import com.assessment.minilogbook.ui.util.getColorForStatus
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import java.util.*
 
@@ -43,7 +44,15 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.title_mini_logbook)) })
+            TopAppBar(
+                title = { Text(stringResource(R.string.title_mini_logbook)) },
+                // Extend the green bar behind the status bar in edge-to-edge mode
+                windowInsets = WindowInsets.statusBars,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
         }
     ) { padding ->
         if (isExpanded) {
@@ -64,7 +73,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))
                 ) {
                     InputSection(state, viewModel, keyboardController, focusManager)
-                    SummarySection(average, state.unit)
+                    SummarySection(average, state.unit, viewModel)
                 }
 
                 // Right Column: History
@@ -85,7 +94,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                 verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))
             ) {
                 InputSection(state, viewModel, keyboardController, focusManager)
-                SummarySection(average, state.unit)
+                SummarySection(average, state.unit, viewModel)
                 HistorySection(state.entries, state.unit, viewModel)
             }
         }
@@ -108,7 +117,17 @@ private fun InputSection(
             SegmentedButton(
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = GlucoseUnit.entries.size),
                 onClick = { viewModel.onUnitChanged(unit) },
-                selected = state.unit == unit
+                selected = state.unit == unit,
+                colors = SegmentedButtonDefaults.colors(
+                    // Selected state: green background with white text
+                    activeContainerColor = MaterialTheme.colorScheme.primary,
+                    activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                    activeBorderColor = MaterialTheme.colorScheme.primary,
+                    // Unselected state: transparent background with green text
+                    inactiveContainerColor = MaterialTheme.colorScheme.surface,
+                    inactiveContentColor = MaterialTheme.colorScheme.primary,
+                    inactiveBorderColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Text(if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl))
             }
@@ -143,20 +162,32 @@ private fun InputSection(
 }
 
 @Composable
-private fun SummarySection(average: Double, unit: GlucoseUnit) {
+private fun SummarySection(average: Double, unit: GlucoseUnit, viewModel: GlucoseViewModel) {
+    // Current state only stores entries in Mmol, so we need to convert average back or calculate status from internal state
+    // For simplicity, we calculate status using Mmol average
+    val avgInMmol = if (unit == GlucoseUnit.MG_DL) average / 18.0182 else average
+    val status = viewModel.getGlucoseStatus(avgInMmol)
+    val statusColor = getColorForStatus(status)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        colors = CardDefaults.cardColors(containerColor = statusColor.copy(alpha = 0.15f)),
+        border = androidx.compose.foundation.BorderStroke(2.dp, statusColor)
     ) {
         Column(
             modifier = Modifier.padding(dimensionResource(R.dimen.padding_medium)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(stringResource(R.string.label_average_bg), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.label_average_bg),
+                style = MaterialTheme.typography.titleMedium,
+                color = statusColor
+            )
             Text(
                 text = "${String.format(Locale.getDefault(), "%.2f", average)} ${if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)}",
                 style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = statusColor
             )
         }
     }
@@ -177,12 +208,11 @@ private fun HistorySection(entries: List<GlucoseEntry>, unit: GlucoseUnit, viewM
             val convertedValue = remember(entry.valueInMmol, unit) {
                 viewModel.convertValue(entry.valueInMmol, unit)
             }
-            val unitLabel = if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)
 
             EntryItem(
                 modifier = Modifier.fillMaxWidth(),
                 value = convertedValue,
-                unitText = unitLabel,
+                unit = unit,
                 timestamp = entry.timestamp
             )
         }
