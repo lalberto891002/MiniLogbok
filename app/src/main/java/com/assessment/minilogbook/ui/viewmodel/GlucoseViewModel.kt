@@ -11,6 +11,7 @@ import com.assessment.minilogbook.domain.usecase.GlucoseConverter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -19,8 +20,6 @@ import kotlinx.coroutines.launch
 data class GlucoseState(
     val entries: List<GlucoseEntry> = emptyList(),
     val unit: GlucoseUnit = GlucoseUnit.MMOL_L,
-    val inputValue: String = "",
-    val errorMessage: String? = null,
     val isLoading: Boolean = true
 )
 
@@ -33,26 +32,25 @@ class GlucoseViewModel(
     private val _inputValue = MutableStateFlow("")
     private val _errorMessage = MutableStateFlow<String?>(null)
 
-    // Declarative state combining the DAO flow and the individual mutable state flows.
-    // stateIn with WhileSubscribed(5_000) avoids re-subscribing on quick recompositions
-    // (e.g. screen rotation) while still cancelling the upstream when no one is listening.
+    // Exposed separately — collecting these never triggers a recomposition of
+    // sections that only read state (entries/unit)
+    val inputValue: StateFlow<String> = _inputValue.asStateFlow()
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    // combine only reacts to DB changes or unit toggle — never to keystrokes
     val state: StateFlow<GlucoseState> = combine(
         glucoseDao.getAllEntries(),
-        _unit,
-        _inputValue,
-        _errorMessage
-    ) { entries, unit, inputValue, errorMessage ->
+        _unit
+    ) { entries, unit ->
         GlucoseState(
             entries = entries,
             unit = unit,
-            inputValue = inputValue,
-            errorMessage = errorMessage,
-            isLoading = false  // Room has emitted, data is ready
+            isLoading = false
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = GlucoseState(isLoading = true)  // Show loading until first emission
+        initialValue = GlucoseState(isLoading = true)
     )
 
     fun onUnitChanged(newUnit: GlucoseUnit) {
@@ -96,6 +94,12 @@ class GlucoseViewModel(
 
     fun convertValue(valueInMmol: Double, toUnit: GlucoseUnit): Double {
         return converter.fromMmol(valueInMmol, toUnit)
+    }
+
+    fun deleteEntry(entry: GlucoseEntry) {
+        viewModelScope.launch {
+            glucoseDao.delete(entry)
+        }
     }
 
     fun getGlucoseStatus(valueInMmol: Double): BloodGlucoseStatus {

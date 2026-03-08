@@ -8,4 +8,6 @@
     <string name="unit_mmol_l">mmol/L</string>
     <string name="unit_mg_dl">mg/dL</string>
     <string name="error_invalid_value">Please enter a valid value >= 0</string>
+    <string name="action_delete">Entry removed</string>
+    <string name="action_undo">Undo</string>
 </resources>

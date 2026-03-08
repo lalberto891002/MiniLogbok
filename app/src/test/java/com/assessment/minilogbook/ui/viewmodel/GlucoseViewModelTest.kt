@@ -66,15 +66,14 @@ class GlucoseViewModelTest(
     }
 
     @Test
-    fun `onInputValueChanged updates state and clears error`() = runTest {
+    fun `onInputValueChanged updates inputValue and clears error`() = runTest {
         val job = collectState()
 
         viewModel.onInputValueChanged("5.5")
         advanceUntilIdle()
 
-        val state = viewModel.state.first()
-        assertEquals("5.5", state.inputValue)
-        assertNull(state.errorMessage)
+        assertEquals("5.5", viewModel.inputValue.first())
+        assertNull(viewModel.errorMessage.first())
 
         job.cancel()
     }
@@ -87,8 +86,7 @@ class GlucoseViewModelTest(
         viewModel.saveEntry()
         advanceUntilIdle()
 
-        val state = viewModel.state.first()
-        assertEquals("Please enter a valid value >= 0", state.errorMessage)
+        assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
         verify(glucoseDao, never()).insert(any())
 
         job.cancel()
@@ -102,8 +100,7 @@ class GlucoseViewModelTest(
         viewModel.saveEntry()
         advanceUntilIdle()
 
-        val state = viewModel.state.first()
-        assertEquals("Please enter a valid value >= 0", state.errorMessage)
+        assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
         verify(glucoseDao, never()).insert(any())
 
         job.cancel()
@@ -117,8 +114,7 @@ class GlucoseViewModelTest(
         viewModel.saveEntry()
         advanceUntilIdle()
 
-        val state = viewModel.state.first()
-        assertEquals("Please enter a valid value >= 0", state.errorMessage)
+        assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
         verify(glucoseDao, never()).insert(any())
 
         job.cancel()
@@ -133,9 +129,8 @@ class GlucoseViewModelTest(
         advanceUntilIdle()
 
         verify(glucoseDao).insert(any())
-        val state = viewModel.state.first()
-        assertEquals("", state.inputValue)
-        assertNull(state.errorMessage)
+        assertEquals("", viewModel.inputValue.first())
+        assertNull(viewModel.errorMessage.first())
 
         job.cancel()
     }
@@ -150,7 +145,7 @@ class GlucoseViewModelTest(
 
         val state = viewModel.state.first()
         assertEquals(GlucoseUnit.MG_DL, state.unit)
-        assertEquals(expectedMgDl.toDouble(), state.inputValue.toDouble(), 0.0001)
+        assertEquals(expectedMgDl.toDouble(), viewModel.inputValue.first().toDouble(), 0.0001)
 
         job.cancel()
     }
@@ -168,7 +163,6 @@ class GlucoseViewModelTest(
 
     @Test
     fun `initial state has isLoading true before Room emits`() = runTest {
-        // Without an active collector, stateIn returns the initialValue immediately
         val state = viewModel.state.value
         assertEquals(true, state.isLoading)
     }

@@ -22,6 +22,9 @@ interface GlucoseDao {
     @Insert
     suspend fun insert(entry: GlucoseEntry)
 
+    @Delete
+    suspend fun delete(entry: GlucoseEntry)
+
     @Query("DELETE FROM glucose_entries")
     suspend fun deleteAll()
 }

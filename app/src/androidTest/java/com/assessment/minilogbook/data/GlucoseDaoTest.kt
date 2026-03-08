@@ -97,4 +97,64 @@ class GlucoseDaoTest(
         val allEntries = glucoseDao.getAllEntries().first()
         assertEquals(0, allEntries.size)
     }
+
+    @Test
+    @Throws(Exception::class)
+    fun deleteSingleEntry_removesOnlyThatEntry() = runBlocking {
+        glucoseDao.insert(GlucoseEntry(valueInMmol = 3.0, timestamp = 1000L))
+        glucoseDao.insert(GlucoseEntry(valueInMmol = 7.0, timestamp = 2000L))
+
+        // Retrieve the inserted entries to get their auto-generated ids
+        val inserted = glucoseDao.getAllEntries().first()
+        val toDelete = inserted.first { it.valueInMmol == 3.0 }
+
+        glucoseDao.delete(toDelete)
+
+        val remaining = glucoseDao.getAllEntries().first()
+        assertEquals(1, remaining.size)
+        assertEquals(7.0, remaining[0].valueInMmol, 0.0)
+    }
+
+    @Test
+    @Throws(Exception::class)
+    fun deleteSingleEntry_listBecomesEmptyWhenOnlyOneEntry() = runBlocking {
+        glucoseDao.insert(GlucoseEntry(valueInMmol = inputValue, timestamp = System.currentTimeMillis()))
+
+        val inserted = glucoseDao.getAllEntries().first()
+        assertEquals(1, inserted.size)
+
+        glucoseDao.delete(inserted[0])
+
+        val remaining = glucoseDao.getAllEntries().first()
+        assertEquals(0, remaining.size)
+    }
+
+    @Test
+    @Throws(Exception::class)
+    fun deleteEntry_doesNotAffectOtherEntries() = runBlocking {
+        val timestamps = listOf(1000L, 2000L, 3000L)
+        timestamps.forEach { glucoseDao.insert(GlucoseEntry(valueInMmol = it.toDouble(), timestamp = it)) }
+
+        val inserted = glucoseDao.getAllEntries().first()
+        val toDelete = inserted.first { it.timestamp == 2000L }
+
+        glucoseDao.delete(toDelete)
+
+        val remaining = glucoseDao.getAllEntries().first()
+        assertEquals(2, remaining.size)
+        assertEquals(listOf(3000.0, 1000.0), remaining.map { it.valueInMmol })
+    }
+
+    @Test
+    @Throws(Exception::class)
+    fun deleteNonExistentEntry_doesNothing() = runBlocking {
+        glucoseDao.insert(GlucoseEntry(valueInMmol = 5.0, timestamp = 1000L))
+
+        // Entry with id=999 was never inserted
+        val phantom = GlucoseEntry(id = 999, valueInMmol = 5.0, timestamp = 1000L)
+        glucoseDao.delete(phantom)
+
+        val remaining = glucoseDao.getAllEntries().first()
+        assertEquals(1, remaining.size)
+    }
 }

@@ -1,5 +1,8 @@
 package com.assessment.minilogbook.ui.screen
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector4D
+import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -9,7 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -22,29 +28,72 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
-import com.assessment.minilogbook.ui.components.StatusValueCard
 import com.assessment.minilogbook.ui.components.EntryItem
 import com.assessment.minilogbook.ui.components.GlucoseInputField
 import com.assessment.minilogbook.ui.components.GlucoseUnitSelector
+import com.assessment.minilogbook.ui.components.StatusValueCard
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
+import kotlinx.coroutines.flow.filter
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val average = viewModel.getAverage(state.unit)
+    val inputValue by viewModel.inputValue.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+
+    val entries by remember { derivedStateOf { state.entries } }
+    val unit by remember { derivedStateOf { state.unit } }
+
+    val average = remember(entries, unit) { viewModel.getAverage(unit) }
+
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val windowInfo = LocalWindowInfo.current
     val density = LocalDensity.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    var pendingDelete by remember { mutableStateOf<Pair<GlucoseEntry, suspend () -> Unit>?>(null) }
+
+    val deleteLabel = stringResource(R.string.action_delete)
+    val undoLabel = stringResource(R.string.action_undo)
+
+    LaunchedEffect(pendingDelete) {
+        val (entry, resetDismiss) = pendingDelete ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = deleteLabel,
+            actionLabel = undoLabel,
+            duration = SnackbarDuration.Short
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            resetDismiss()
+        } else {
+            viewModel.deleteEntry(entry)
+            focusManager.clearFocus()
+        }
+        pendingDelete = null
+    }
+
+    // Stable lambdas — same instance for the lifetime of the screen
+    val onUnitSelected: (GlucoseUnit) -> Unit = remember(viewModel) { { viewModel.onUnitChanged(it) } }
+    val onValueChange: (String) -> Unit = remember(viewModel) { { viewModel.onInputValueChanged(it) } }
+    val onSave: () -> Unit = remember(viewModel, keyboardController, focusManager) {
+        {
+            viewModel.saveEntry()
+            keyboardController?.hide()
+            focusManager.clearFocus()
+        }
+    }
+    val onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit =
+        remember { { pendingDelete = it } }
 
     val isExpanded = with(density) {
         windowInfo.containerSize.width.toDp() > 600.dp
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.title_mini_logbook)) },
@@ -77,7 +126,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     .padding(dimensionResource(R.dimen.padding_medium)),
                 horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_large))
             ) {
-                // Left Column: Input and Summary
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -86,16 +134,26 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))
                 ) {
-                    InputSection(state, viewModel, keyboardController, focusManager)
-                    SummarySection(average, state.unit, viewModel)
+                    InputSection(
+                        unit = unit,
+                        inputValue = inputValue,
+                        errorMessage = errorMessage,
+                        onUnitSelected = onUnitSelected,
+                        onValueChange = onValueChange,
+                        onSave = onSave
+                    )
+                    SummarySection(average, unit, viewModel)
                 }
-
-                // Right Column: History
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))
                 ) {
-                    HistorySection(state.entries, state.unit, viewModel)
+                    HistorySection(
+                        entries = entries,
+                        unit = unit,
+                        viewModel = viewModel,
+                        onDeleteRequest = onDeleteRequest
+                    )
                 }
             }
         } else {
@@ -107,9 +165,21 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))
             ) {
-                InputSection(state, viewModel, keyboardController, focusManager)
-                SummarySection(average, state.unit, viewModel)
-                HistorySection(state.entries, state.unit, viewModel)
+                InputSection(
+                    unit = unit,
+                    inputValue = inputValue,
+                    errorMessage = errorMessage,
+                    onUnitSelected = onUnitSelected,
+                    onValueChange = onValueChange,
+                    onSave = onSave
+                )
+                SummarySection(average, unit, viewModel)
+                HistorySection(
+                    entries = entries,
+                    unit = unit,
+                    viewModel = viewModel,
+                    onDeleteRequest = onDeleteRequest
+                )
             }
         }
     }
@@ -118,39 +188,35 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InputSection(
-    state: com.assessment.minilogbook.ui.viewmodel.GlucoseState,
-    viewModel: GlucoseViewModel,
-    keyboardController: SoftwareKeyboardController?,
-    focusManager: FocusManager
+    unit: GlucoseUnit,
+    inputValue: String,
+    errorMessage: String?,
+    onUnitSelected: (GlucoseUnit) -> Unit,
+    onValueChange: (String) -> Unit,
+    onSave: () -> Unit
 ) {
-    // Unit Selector
+    val unitText = if (unit == GlucoseUnit.MMOL_L)
+        stringResource(R.string.unit_mmol_l)
+    else
+        stringResource(R.string.unit_mg_dl)
+
     GlucoseUnitSelector(
-        selectedUnit = state.unit,
-        onUnitSelected = { viewModel.onUnitChanged(it) },
+        selectedUnit = unit,
+        onUnitSelected = onUnitSelected,
         modifier = Modifier.fillMaxWidth()
     )
 
-    // Input Field
     GlucoseInputField(
         modifier = Modifier.fillMaxWidth(),
-        value = state.inputValue,
-        onValueChange = { viewModel.onInputValueChanged(it) },
-        unitText = if (state.unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl),
-        onDone = {
-            viewModel.saveEntry()
-            keyboardController?.hide()
-            focusManager.clearFocus()
-        },
-        errorMessage = if (state.errorMessage != null) stringResource(R.string.error_invalid_value) else null
+        value = inputValue,
+        onValueChange = onValueChange,
+        unitText = unitText,
+        onDone = onSave,
+        errorMessage = if (errorMessage != null) stringResource(R.string.error_invalid_value) else null
     )
 
-    // Save Button
     Button(
-        onClick = {
-            viewModel.saveEntry()
-            keyboardController?.hide()
-            focusManager.clearFocus()
-        },
+        onClick = onSave,
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(stringResource(R.string.action_save))
@@ -171,8 +237,14 @@ private fun SummarySection(average: Double, unit: GlucoseUnit, viewModel: Glucos
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HistorySection(entries: List<GlucoseEntry>, unit: GlucoseUnit, viewModel: GlucoseViewModel) {
+private fun HistorySection(
+    entries: List<GlucoseEntry>,
+    unit: GlucoseUnit,
+    viewModel: GlucoseViewModel,
+    onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit
+) {
     Text(stringResource(R.string.label_previous_entries), style = MaterialTheme.typography.titleLarge)
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -181,18 +253,64 @@ private fun HistorySection(entries: List<GlucoseEntry>, unit: GlucoseUnit, viewM
     ) {
         itemsIndexed(
             items = entries,
-            key = { _, entry -> entry.timestamp }
+            key = { _, entry -> entry.id }
         ) { _, entry ->
             val convertedValue = remember(entry.valueInMmol, unit) {
                 viewModel.convertValue(entry.valueInMmol, unit)
             }
 
-            EntryItem(
-                modifier = Modifier.fillMaxWidth(),
-                value = convertedValue,
-                unit = unit,
-                timestamp = entry.timestamp
-            )
+            val dismissState = rememberSwipeToDismissBoxState()
+            val isDismissed by remember {
+                derivedStateOf { dismissState.currentValue == SwipeToDismissBoxValue.EndToStart }
+            }
+
+            LaunchedEffect(dismissState) {
+                snapshotFlow { dismissState.currentValue }
+                    .filter { it == SwipeToDismissBoxValue.EndToStart }
+                    .collect {
+                        onDeleteRequest(entry to dismissState::reset)
+                    }
+            }
+
+            SwipeToDismissBox(
+                state = dismissState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateItem(),
+                enableDismissFromStartToEnd = false,
+                backgroundContent = {
+                    val errorColor = MaterialTheme.colorScheme.errorContainer
+                    val surfaceColor = MaterialTheme.colorScheme.surface
+                    val colorConverter: TwoWayConverter<Color, AnimationVector4D> = TwoWayConverter(
+                        convertToVector = { color ->
+                            AnimationVector4D(color.red, color.green, color.blue, color.alpha)
+                        },
+                        convertFromVector = { vector ->
+                            Color(vector.v1, vector.v2, vector.v3, vector.v4)
+                        }
+                    )
+                    val animatable = remember { Animatable(surfaceColor, colorConverter) }
+
+                    LaunchedEffect(isDismissed) {
+                        animatable.animateTo(if (isDismissed) errorColor else surfaceColor)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(MaterialTheme.shapes.medium)
+                            .drawBehind { drawRect(animatable.value) }
+                    )
+                }
+            ) {
+                EntryItem(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = convertedValue,
+                    unit = unit,
+                    timestamp = entry.timestamp,
+                    onDelete = { onDeleteRequest(entry to dismissState::reset) }
+                )
+            }
         }
     }
 }

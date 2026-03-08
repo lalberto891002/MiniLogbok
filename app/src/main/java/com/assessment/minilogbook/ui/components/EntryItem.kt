@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.data.GlucoseUnit
@@ -21,6 +23,7 @@ import java.util.*
  * @param value The glucose value already converted to the current unit.
  * @param unit The unit of the displayed value, used to determine the glucose status color.
  * @param timestamp The timestamp of the entry.
+ * @param onDelete Called when the user taps the delete icon button.
  * @param modifier The modifier to be applied to the layout.
  */
 @Composable
@@ -28,6 +31,7 @@ fun EntryItem(
     value: Double,
     unit: GlucoseUnit,
     timestamp: Long,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val converter = remember { GlucoseConverter() }
@@ -57,11 +61,12 @@ fun EntryItem(
     ) {
         Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .padding(dimensionResource(R.dimen.padding_medium)),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = formattedValue,
                     style = MaterialTheme.typography.bodyLarge,
@@ -71,6 +76,13 @@ fun EntryItem(
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.bodySmall
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_delete),
+                    contentDescription = stringResource(R.string.action_delete),
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
         }
