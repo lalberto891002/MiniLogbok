@@ -1,9 +1,11 @@
 package com.assessment.minilogbook.domain.usecase
 
 import com.assessment.minilogbook.data.GlucoseUnit
+import java.util.Locale
+import kotlin.math.round
 
 /**
- * Class for converting and validating blood glucose values.
+ * Utility class for converting and validating blood glucose values.
  *
  * This class handles the conversion logic between different glucose units (mmol/L and mg/dL)
  * and provides basic validation rules.
@@ -36,16 +38,17 @@ class GlucoseConverter {
      * @param value The value to convert.
      * @param fromUnit The current unit of the value.
      * @param toUnit The target unit for conversion.
-     * @return The converted glucose value.
+     * @return The converted glucose value rounded to 4 decimal places.
      */
     fun convertValue(value: Double, fromUnit: GlucoseUnit, toUnit: GlucoseUnit): Double {
-        if (fromUnit == toUnit) return value
+        if (fromUnit == toUnit) return roundToFourDecimals(value)
 
-        return if (toUnit == GlucoseUnit.MG_DL) {
+        val converted = if (toUnit == GlucoseUnit.MG_DL) {
             value * CONVERSION_FACTOR
         } else {
             value / CONVERSION_FACTOR
         }
+        return roundToFourDecimals(converted)
     }
 
     /**
@@ -53,14 +56,15 @@ class GlucoseConverter {
      *
      * @param value The value to convert.
      * @param currentUnit The unit the value is currently in.
-     * @return The value converted to mmol/L.
+     * @return The value converted to mmol/L rounded to 4 decimal places.
      */
     fun toMmol(value: Double, currentUnit: GlucoseUnit): Double {
-        return if (currentUnit == GlucoseUnit.MG_DL) {
+        val result = if (currentUnit == GlucoseUnit.MG_DL) {
             value / CONVERSION_FACTOR
         } else {
             value
         }
+        return roundToFourDecimals(result)
     }
 
     /**
@@ -68,14 +72,15 @@ class GlucoseConverter {
      *
      * @param valueInMmol The value in mmol/L.
      * @param targetUnit The unit to convert to.
-     * @return The value converted to the target unit.
+     * @return The value converted to the target unit rounded to 4 decimal places.
      */
     fun fromMmol(valueInMmol: Double, targetUnit: GlucoseUnit): Double {
-        return if (targetUnit == GlucoseUnit.MG_DL) {
+        val result = if (targetUnit == GlucoseUnit.MG_DL) {
             valueInMmol * CONVERSION_FACTOR
         } else {
             valueInMmol
         }
+        return roundToFourDecimals(result)
     }
 
     /**
@@ -86,11 +91,15 @@ class GlucoseConverter {
      *
      * @param value The numeric value to process.
      * @param currentUnit The unit the value is currently in.
-     * @return The value in mmol/L if valid, or `null` if the input is null or invalid.
+     * @return The value in mmol/L rounded to 4 decimal places if valid, or `null` if the input is null or invalid.
      */
     fun toMmolIfValid(value: Double?, currentUnit: GlucoseUnit): Double? {
         return value?.takeIf { validateValue(it) }?.let {
-            if (currentUnit == GlucoseUnit.MG_DL) it / CONVERSION_FACTOR else it
+            toMmol(it, currentUnit)
         }
+    }
+
+    private fun roundToFourDecimals(value: Double): Double {
+        return String.format(Locale.US, "%.4f", value).toDouble()
     }
 }
