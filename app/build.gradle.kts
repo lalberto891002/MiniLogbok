@@ -58,6 +58,8 @@ dependencies {
 
     // ViewModel Compose
     implementation(libs.androidx.lifecycle.viewmodel.compose.lib)
+    // Provides collectAsStateWithLifecycle for lifecycle-aware state collection
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     // Koin
     implementation(libs.koin.android)

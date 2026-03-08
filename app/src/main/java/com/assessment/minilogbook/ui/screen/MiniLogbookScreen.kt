@@ -19,6 +19,7 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
@@ -31,7 +32,7 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val average = viewModel.getAverage(state.unit)
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -46,7 +47,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.title_mini_logbook)) },
-                // Extend the green bar behind the status bar in edge-to-edge mode
                 windowInsets = WindowInsets.statusBars,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -55,6 +55,19 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
             )
         }
     ) { padding ->
+
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+            return@Scaffold
+        }
+
         if (isExpanded) {
             Row(
                 modifier = Modifier
@@ -87,8 +100,8 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
         } else {
             Column(
                 modifier = Modifier
-                    .padding(padding)
                     .fillMaxSize()
+                    .padding(padding)
                     .padding(dimensionResource(R.dimen.padding_medium)),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))

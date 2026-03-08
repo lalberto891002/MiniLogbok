@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -57,72 +58,141 @@ class GlucoseViewModelTest(
         Dispatchers.resetMain()
     }
 
+    // Helper to activate the stateIn flow and get the first emission.
+    // stateIn with WhileSubscribed requires an active collector to start upstream.
+    // We launch a collector inside the test scope to trigger the flow subscription.
+    private fun TestScope.collectState() = launch {
+        viewModel.state.collect {}
+    }
+
     @Test
     fun `onInputValueChanged updates state and clears error`() = runTest {
+        val job = collectState()
+
         viewModel.onInputValueChanged("5.5")
+        advanceUntilIdle()
+
         val state = viewModel.state.first()
         assertEquals("5.5", state.inputValue)
         assertNull(state.errorMessage)
+
+        job.cancel()
     }
 
     @Test
     fun `saveEntry with empty input sets error message`() = runTest {
+        val job = collectState()
+
         viewModel.onInputValueChanged("")
         viewModel.saveEntry()
+        advanceUntilIdle()
+
         val state = viewModel.state.first()
         assertEquals("Please enter a valid value >= 0", state.errorMessage)
         verify(glucoseDao, never()).insert(any())
+
+        job.cancel()
     }
 
     @Test
     fun `saveEntry with invalid number input sets error message`() = runTest {
+        val job = collectState()
+
         viewModel.onInputValueChanged("abc")
         viewModel.saveEntry()
+        advanceUntilIdle()
+
         val state = viewModel.state.first()
         assertEquals("Please enter a valid value >= 0", state.errorMessage)
         verify(glucoseDao, never()).insert(any())
+
+        job.cancel()
     }
 
     @Test
     fun `saveEntry with negative input sets error message`() = runTest {
+        val job = collectState()
+
         viewModel.onInputValueChanged("-1.0")
         viewModel.saveEntry()
+        advanceUntilIdle()
+
         val state = viewModel.state.first()
         assertEquals("Please enter a valid value >= 0", state.errorMessage)
         verify(glucoseDao, never()).insert(any())
+
+        job.cancel()
     }
 
     @Test
     fun `saveEntry with valid input inserts into dao and clears input`() = runTest {
+        val job = collectState()
+
         viewModel.onInputValueChanged("5.0")
         viewModel.saveEntry()
-        testDispatcher.scheduler.advanceUntilIdle()
+        advanceUntilIdle()
 
         verify(glucoseDao).insert(any())
         val state = viewModel.state.first()
         assertEquals("", state.inputValue)
         assertNull(state.errorMessage)
+
+        job.cancel()
     }
 
     @Test
     fun `onUnitChanged converts current input value parameterized`() = runTest {
-        // Start with mmol/L (default set in GlucoseState)
-        viewModel.onInputValueChanged(inputMmol)
+        val job = collectState()
 
-        // Change to mg/dL
+        viewModel.onInputValueChanged(inputMmol)
         viewModel.onUnitChanged(GlucoseUnit.MG_DL)
+        advanceUntilIdle()
 
         val state = viewModel.state.first()
         assertEquals(GlucoseUnit.MG_DL, state.unit)
-
-        // Use a small helper to normalize strings if necessary,
-        // but GlucoseConverter now returns exactly 4 decimal places via roundToFourDecimals
         assertEquals(expectedMgDl.toDouble(), state.inputValue.toDouble(), 0.0001)
+
+        job.cancel()
     }
 
     @Test
-    fun `getAverage returns 0 when no entries`() {
+    fun `getAverage returns 0 when no entries`() = runTest {
+        val job = collectState()
+        advanceUntilIdle()
+
         val average = viewModel.getAverage(GlucoseUnit.MMOL_L)
         assertEquals(0.0, average, 0.001)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `initial state has isLoading true before Room emits`() = runTest {
+        // Without an active collector, stateIn returns the initialValue immediately
+        val state = viewModel.state.value
+        assertEquals(true, state.isLoading)
+    }
+
+    @Test
+    fun `isLoading becomes false after Room emits first value`() = runTest {
+        val job = collectState()
+        advanceUntilIdle()
+
+        val state = viewModel.state.first()
+        assertEquals(false, state.isLoading)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `isLoading is false even when entries list is empty`() = runTest {
+        val job = collectState()
+        advanceUntilIdle()
+
+        val state = viewModel.state.first()
+        assertEquals(false, state.isLoading)
+        assertEquals(emptyList<Any>(), state.entries)
+
+        job.cancel()
     }
 }
