@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -37,10 +34,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +48,8 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
@@ -82,25 +79,10 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
     val windowInfo = LocalWindowInfo.current
     val density = LocalDensity.current
     val snackbarHostState = remember { SnackbarHostState() }
-    var pendingDelete by remember { mutableStateOf<Pair<GlucoseEntry, suspend () -> Unit>?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     val deleteLabel = stringResource(R.string.action_delete)
     val undoLabel = stringResource(R.string.action_undo)
-
-    LaunchedEffect(pendingDelete) {
-        val (entry, resetDismiss) = pendingDelete ?: return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
-            message = deleteLabel,
-            actionLabel = undoLabel,
-            duration = SnackbarDuration.Short
-        )
-        if (result == SnackbarResult.ActionPerformed) {
-            resetDismiss()
-        } else {
-            viewModel.deleteEntry(entry)
-        }
-        pendingDelete = null
-    }
 
     val onUnitSelected: (GlucoseUnit) -> Unit = { viewModel.onUnitChanged(it) }
     val onValueChange: (String) -> Unit = { viewModel.onInputValueChanged(it) }
@@ -109,9 +91,25 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
         keyboardController?.hide()
     }
 
-    // used by HistorySection to trigger the delete snackbar when an entry is swiped out or the delete button is tapped
+    // Fix: Using a coroutine inside the request handler ensures that multiple deletes
+    // are queued correctly in the SnackbarHostState and none are lost due to cancellation.
     val onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit =
-        remember { { pendingDelete = it } }
+        remember {
+            { (entry, resetDismiss) ->
+                coroutineScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = deleteLabel,
+                        actionLabel = undoLabel,
+                        duration = SnackbarDuration.Short
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        resetDismiss()
+                    } else {
+                        viewModel.deleteEntry(entry)
+                    }
+                }
+            }
+        }
 
     val isExpanded = with(density) {
         windowInfo.containerSize.width.toDp() > 600.dp
@@ -296,9 +294,7 @@ private fun HistorySection(
             val coroutineScope = rememberCoroutineScope()
 
             LaunchedEffect(dismissState) {
-                snapshotFlow { dismissState.currentValue } //this flow emits the current swipe state
-                    // whenever it changes and allows to skip recompositions by filtering for the specific state we care about
-                    // (EndToStart) before triggering the delete snackbar.
+                snapshotFlow { dismissState.currentValue }
                     .filter { it == SwipeToDismissBoxValue.EndToStart }
                     .collect {
                         onDeleteRequest(entry to dismissState::reset)
@@ -334,8 +330,6 @@ private fun HistorySection(
                     unit = unit,
                     timestamp = entry.timestamp,
                     onDelete = {
-                        // Programmatically trigger the same slide-out animation as a real swipe.
-                        // The snapshotFlow observer picks up EndToStart and shows the snackbar.
                         coroutineScope.launch {
                             dismissState.dismiss(SwipeToDismissBoxValue.EndToStart)
                         }
