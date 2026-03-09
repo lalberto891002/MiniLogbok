@@ -62,7 +62,6 @@ fun EntryItem(
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(dimensionResource(R.dimen.padding_medium)),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
