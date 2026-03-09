@@ -244,8 +244,7 @@ private fun InputSection(
 
 @Composable
 private fun SummarySection(average: Double, unit: GlucoseUnit, viewModel: GlucoseViewModel) {
-    val avgInMmol =  viewModel.convertValue(average, GlucoseUnit.MMOL_L)
-    val status = viewModel.getGlucoseStatus(avgInMmol)
+    val status = viewModel.getGlucoseStatusByUnit(average, unit)
     val unitLabel =
         if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)
 
