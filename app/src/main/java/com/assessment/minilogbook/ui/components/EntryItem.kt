@@ -44,10 +44,8 @@ fun EntryItem(
         String.format(Locale.getDefault(), "%.2f %s", value, unitLabel)
     }
 
-    val formattedDate = remember(timestamp) {
-        val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-        dateFormat.format(Date(timestamp))
-    }
+    val formattedDate = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+        .format(Date(timestamp))
 
     Card(
         modifier = modifier.testTag("entry_$formattedValue"),

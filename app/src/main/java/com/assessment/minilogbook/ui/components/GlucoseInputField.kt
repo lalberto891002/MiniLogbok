@@ -49,12 +49,10 @@ fun GlucoseInputField(
         errorMessage?.let { msg -> { Text(msg) } }
     }
 
-    val keyboardOptions = remember {
-        KeyboardOptions(
-            keyboardType = KeyboardType.Decimal,
-            imeAction = ImeAction.Done
-        )
-    }
+    val keyboardOptions = KeyboardOptions(
+        keyboardType = KeyboardType.Decimal,
+        imeAction = ImeAction.Done
+    )
 
     val onDoneState = rememberUpdatedState(onDone)
 
