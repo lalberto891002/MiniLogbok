@@ -69,7 +69,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
             resetDismiss()
         } else {
             viewModel.deleteEntry(entry)
-            focusManager.clearFocus()
         }
         pendingDelete = null
     }
