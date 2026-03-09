@@ -2,7 +2,7 @@ package com.assessment.minilogbook.ui.viewmodel
 
 import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseUnit
-import com.assessment.minilogbook.domain.usecase.GlucoseConverter
+import com.assessment.minilogbook.domain.usecase.GlucoseService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +29,7 @@ class GlucoseViewModelTest(
 ) {
 
     private val glucoseDao: GlucoseDao = mock()
-    private val converter = GlucoseConverter()
+    private val converter = GlucoseService()
     private lateinit var viewModel: GlucoseViewModel
 
     private val testDispatcher = StandardTestDispatcher()

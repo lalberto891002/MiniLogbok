@@ -9,7 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.assessment.minilogbook.MainActivity
 import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseDatabase
-import com.assessment.minilogbook.domain.usecase.GlucoseConverter
+import com.assessment.minilogbook.domain.usecase.GlucoseService
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.Rule
@@ -56,7 +56,7 @@ class MiniLogbookScreenTest {
                 modules(
                     module {
                         single<GlucoseDao> { dao }
-                        factoryOf(::GlucoseConverter)
+                        factoryOf(::GlucoseService)
                         viewModelOf(::GlucoseViewModel)
                     }
                 )

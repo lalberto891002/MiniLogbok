@@ -9,8 +9,10 @@ import java.util.Locale
  *
  * This class handles the conversion logic between different glucose units (mmol/L and mg/dL)
  * and provides basic validation rules.
+ * If the project grows in complexity, we can consider splitting this into separate classes (e.g., a Validator and a Converter),
+ * but for now it is simple enough to keep it together.
  */
-class GlucoseConverter {
+class GlucoseService {
     companion object {
         /**
          * The constant factor used for converting between mmol/L and mg/dL.

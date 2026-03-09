@@ -13,7 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.data.GlucoseUnit
-import com.assessment.minilogbook.domain.usecase.GlucoseConverter
+import com.assessment.minilogbook.domain.usecase.GlucoseService
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import java.text.SimpleDateFormat
 import java.util.*
@@ -35,7 +35,7 @@ fun EntryItem(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val converter = remember { GlucoseConverter() }
+    val converter = remember { GlucoseService() }
 
     // Memoize the glucose status using the already-converted value and its unit.
     // Only recalculated when value or unit changes.

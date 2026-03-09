@@ -1,7 +1,7 @@
 package com.assessment.minilogbook.di
 
 import com.assessment.minilogbook.data.GlucoseDatabase
-import com.assessment.minilogbook.domain.usecase.GlucoseConverter
+import com.assessment.minilogbook.domain.usecase.GlucoseService
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.factoryOf
@@ -16,7 +16,7 @@ val appModule = module {
     single { get<GlucoseDatabase>().glucoseDao() }
 
     // Define factory using constructor DSL
-    factoryOf(::GlucoseConverter)
+    factoryOf(::GlucoseService)
 
     // Define ViewModel using constructor DSL from core module
     viewModelOf(::GlucoseViewModel)
