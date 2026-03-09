@@ -23,7 +23,9 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import org.mockito.Mockito.*
 import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -34,7 +36,7 @@ class GlucoseViewModelTest(
 ) {
 
     private val glucoseDao: GlucoseDao = mock()
-    private val converter: IGlucoseService = GlucoseService()
+    private val converter: IGlucoseService = mock()
     private lateinit var viewModel: GlucoseViewModel
     private val averageFlow = MutableStateFlow<Double?>(null)
 
@@ -57,6 +59,15 @@ class GlucoseViewModelTest(
         Dispatchers.setMain(testDispatcher)
         whenever(glucoseDao.getAverageValue()).thenReturn(averageFlow)
         whenever(glucoseDao.getAllEntries()).thenReturn(FakePagingSource())
+
+        // Default stubs so the ViewModel does not crash when the service is called
+        whenever(converter.validateValue(any())).thenReturn(true)
+        whenever(converter.toMmolIfValid(org.mockito.kotlin.anyOrNull(), any())).thenReturn(null)
+        whenever(converter.convertValue(any(), any(), any())).thenReturn(0.0)
+        whenever(converter.fromMmol(any(), any())).thenReturn(0.0)
+        whenever(converter.getGlucoseStatus(any())).thenReturn(BloodGlucoseStatus.IN_TARGET)
+        whenever(converter.getGlucoseStatusByUnit(any(), any())).thenReturn(BloodGlucoseStatus.IN_TARGET)
+
         viewModel = GlucoseViewModel(glucoseDao, converter)
     }
 
@@ -94,6 +105,8 @@ class GlucoseViewModelTest(
         advanceUntilIdle()
 
         assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
+        // null input — toMmolIfValid is called with null, which returns null (default stub)
+        verify(converter).toMmolIfValid(org.mockito.kotlin.isNull(), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao, never()).insert(any())
 
         job.cancel()
@@ -108,6 +121,8 @@ class GlucoseViewModelTest(
         advanceUntilIdle()
 
         assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
+        // "abc".toDoubleOrNull() == null → toMmolIfValid called with null
+        verify(converter).toMmolIfValid(org.mockito.kotlin.isNull(), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao, never()).insert(any())
 
         job.cancel()
@@ -122,6 +137,7 @@ class GlucoseViewModelTest(
         advanceUntilIdle()
 
         assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
+        verify(converter).toMmolIfValid(eq(-1.0), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao, never()).insert(any())
 
         job.cancel()
@@ -131,10 +147,13 @@ class GlucoseViewModelTest(
     fun `saveEntry with valid input inserts into dao and clears input`() = runTest {
         val job = collectState()
 
+        whenever(converter.toMmolIfValid(eq(5.0), eq(GlucoseUnit.MMOL_L))).thenReturn(5.0)
+
         viewModel.onInputValueChanged("5.0")
         viewModel.saveEntry()
         advanceUntilIdle()
 
+        verify(converter).toMmolIfValid(eq(5.0), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao).insert(any())
         assertEquals("", viewModel.inputValue.first())
         assertNull(viewModel.errorMessage.first())
@@ -146,13 +165,22 @@ class GlucoseViewModelTest(
     fun `onUnitChanged converts current input value parameterized`() = runTest {
         val job = collectState()
 
+        val inputDouble = inputMmol.toDouble()
+        val expectedDouble = expectedMgDl.toDouble()
+
+        // Stub convertValue to return the expected mg/dL value for this parameter set
+        whenever(
+            converter.convertValue(eq(inputDouble), eq(GlucoseUnit.MMOL_L), eq(GlucoseUnit.MG_DL))
+        ).thenReturn(expectedDouble)
+
         viewModel.onInputValueChanged(inputMmol)
         viewModel.onUnitChanged(GlucoseUnit.MG_DL)
         advanceUntilIdle()
 
         val state = viewModel.state.first()
         assertEquals(GlucoseUnit.MG_DL, state.unit)
-        assertEquals(expectedMgDl.toDouble(), viewModel.inputValue.first().toDouble(), 0.0001)
+        verify(converter).convertValue(eq(inputDouble), eq(GlucoseUnit.MMOL_L), eq(GlucoseUnit.MG_DL))
+        assertEquals(expectedDouble, viewModel.inputValue.first().toDouble(), 0.0001)
 
         job.cancel()
     }
@@ -174,12 +202,16 @@ class GlucoseViewModelTest(
         val job = collectState()
 
         // Simulate DB returning average of 10.0 mmol/L
+        whenever(converter.fromMmol(eq(10.0), eq(GlucoseUnit.MMOL_L))).thenReturn(10.0)
+        whenever(converter.fromMmol(eq(10.0), eq(GlucoseUnit.MG_DL))).thenReturn(180.182)
+
         averageFlow.emit(10.0)
         advanceUntilIdle()
 
         var state = viewModel.state.first()
         // Default unit is MMOL_L, so average should be 10.0
         assertEquals(10.0, state.average, 0.001)
+        verify(converter).fromMmol(eq(10.0), eq(GlucoseUnit.MMOL_L))
 
         // Switch unit to MG_DL
         viewModel.onUnitChanged(GlucoseUnit.MG_DL)
@@ -188,6 +220,7 @@ class GlucoseViewModelTest(
         state = viewModel.state.first()
         // 10.0 * 18.0182 = 180.182
         assertEquals(180.182, state.average, 0.001)
+        verify(converter).fromMmol(eq(10.0), eq(GlucoseUnit.MG_DL))
 
         job.cancel()
     }
@@ -217,70 +250,103 @@ class GlucoseViewModelTest(
     fun `getGlucoseStatus returns IN_TARGET for value in 90-140 mgDl range`() {
         // 100 mg/dL → ~5.55 mmol/L
         val valueInMmol = 100.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(converter.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.IN_TARGET)
+
         assertEquals(BloodGlucoseStatus.IN_TARGET, viewModel.getGlucoseStatus(valueInMmol))
+        verify(converter).getGlucoseStatus(eq(valueInMmol))
     }
 
     @Test
     fun `getGlucoseStatus returns OK for value in low ok range`() {
         // 80 mg/dL → ~4.44 mmol/L
         val valueInMmol = 80.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(converter.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.OK)
+
         assertEquals(BloodGlucoseStatus.OK, viewModel.getGlucoseStatus(valueInMmol))
+        verify(converter).getGlucoseStatus(eq(valueInMmol))
     }
 
     @Test
     fun `getGlucoseStatus returns OK for value in high ok range`() {
         // 160 mg/dL → ~8.88 mmol/L
         val valueInMmol = 160.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(converter.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.OK)
+
         assertEquals(BloodGlucoseStatus.OK, viewModel.getGlucoseStatus(valueInMmol))
+        verify(converter).getGlucoseStatus(eq(valueInMmol))
     }
 
     @Test
     fun `getGlucoseStatus returns OUT_OF_RANGE for value below 70 mgDl`() {
         // 50 mg/dL → ~2.77 mmol/L
         val valueInMmol = 50.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(converter.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.OUT_OF_RANGE)
+
         assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.getGlucoseStatus(valueInMmol))
+        verify(converter).getGlucoseStatus(eq(valueInMmol))
     }
 
     @Test
     fun `getGlucoseStatus returns OUT_OF_RANGE for value above 180 mgDl`() {
         // 200 mg/dL → ~11.10 mmol/L
         val valueInMmol = 200.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(converter.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.OUT_OF_RANGE)
+
         assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.getGlucoseStatus(valueInMmol))
+        verify(converter).getGlucoseStatus(eq(valueInMmol))
     }
 
     // --- getGlucoseStatusByUnit (value + explicit unit) ---
 
     @Test
     fun `getGlucoseStatusByUnit returns IN_TARGET for mgDl value in target range`() {
+        whenever(converter.getGlucoseStatusByUnit(eq(100.0), eq(GlucoseUnit.MG_DL))).thenReturn(BloodGlucoseStatus.IN_TARGET)
+
         assertEquals(BloodGlucoseStatus.IN_TARGET, viewModel.getGlucoseStatusByUnit(100.0, GlucoseUnit.MG_DL))
+        verify(converter).getGlucoseStatusByUnit(eq(100.0), eq(GlucoseUnit.MG_DL))
     }
 
     @Test
     fun `getGlucoseStatusByUnit returns IN_TARGET for mmolL value in target range`() {
         val valueInMmol = 100.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(converter.getGlucoseStatusByUnit(eq(valueInMmol), eq(GlucoseUnit.MMOL_L))).thenReturn(BloodGlucoseStatus.IN_TARGET)
+
         assertEquals(BloodGlucoseStatus.IN_TARGET, viewModel.getGlucoseStatusByUnit(valueInMmol, GlucoseUnit.MMOL_L))
+        verify(converter).getGlucoseStatusByUnit(eq(valueInMmol), eq(GlucoseUnit.MMOL_L))
     }
 
     @Test
     fun `getGlucoseStatusByUnit returns OK for mgDl value in ok range`() {
+        whenever(converter.getGlucoseStatusByUnit(eq(160.0), eq(GlucoseUnit.MG_DL))).thenReturn(BloodGlucoseStatus.OK)
+
         assertEquals(BloodGlucoseStatus.OK, viewModel.getGlucoseStatusByUnit(160.0, GlucoseUnit.MG_DL))
+        verify(converter).getGlucoseStatusByUnit(eq(160.0), eq(GlucoseUnit.MG_DL))
     }
 
     @Test
     fun `getGlucoseStatusByUnit returns OK for mmolL value in ok range`() {
         val valueInMmol = 160.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(converter.getGlucoseStatusByUnit(eq(valueInMmol), eq(GlucoseUnit.MMOL_L))).thenReturn(BloodGlucoseStatus.OK)
+
         assertEquals(BloodGlucoseStatus.OK, viewModel.getGlucoseStatusByUnit(valueInMmol, GlucoseUnit.MMOL_L))
+        verify(converter).getGlucoseStatusByUnit(eq(valueInMmol), eq(GlucoseUnit.MMOL_L))
     }
 
     @Test
     fun `getGlucoseStatusByUnit returns OUT_OF_RANGE for mgDl value above 180`() {
+        whenever(converter.getGlucoseStatusByUnit(eq(200.0), eq(GlucoseUnit.MG_DL))).thenReturn(BloodGlucoseStatus.OUT_OF_RANGE)
+
         assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.getGlucoseStatusByUnit(200.0, GlucoseUnit.MG_DL))
+        verify(converter).getGlucoseStatusByUnit(eq(200.0), eq(GlucoseUnit.MG_DL))
     }
 
     @Test
     fun `getGlucoseStatusByUnit returns OUT_OF_RANGE for mmolL value below 70 mgDl equivalent`() {
         val valueInMmol = 50.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(converter.getGlucoseStatusByUnit(eq(valueInMmol), eq(GlucoseUnit.MMOL_L))).thenReturn(BloodGlucoseStatus.OUT_OF_RANGE)
+
         assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.getGlucoseStatusByUnit(valueInMmol, GlucoseUnit.MMOL_L))
+        verify(converter).getGlucoseStatusByUnit(eq(valueInMmol), eq(GlucoseUnit.MMOL_L))
     }
 }
 
