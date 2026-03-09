@@ -81,7 +81,7 @@ app/
 
 - **`InputSection`** — receives individual slices (`inputValue`, `unit`, `errorMessage`) and stable lambda references; only recomposes when its own data changes
 - **`SummarySection`** — displays the average card; only recomposes when `entries` or `unit` change
-- **`HistorySection`** — `LazyColumn` with `SwipeToDismissBox` per item; receives `entries` and `unit` via `derivedStateOf` so it is completely isolated from keystroke recompositions
+- **`HistorySection`** — `LazyColumn` with `SwipeToDismissBox` per item; auto-scrolls to the top when a new entry is added
 
 ---
 
@@ -91,19 +91,20 @@ app/
 
 | Technique | Where | Why |
 |---|---|---|
-| `derivedStateOf` on `entries` and `unit` | `MiniLogbookScreen` | Prevents `HistorySection` from recomposing on every keystroke |
-| Separate `StateFlow` for `inputValue` / `errorMessage` | `GlucoseViewModel` | `combine()` no longer fires on typing |
-| Stable `remember`-wrapped lambdas | `MiniLogbookScreen` | Child composables skip recomposition when params are equal |
-| `snapshotFlow + filter` instead of `LaunchedEffect(currentValue)` | `HistorySection` item | Fires only once when swipe settles, not on every drag offset |
-| `Animatable + drawBehind` instead of `animateColorAsState` | `SwipeToDismissBox` background | Color animation runs in the draw phase — zero recompositions per frame |
+| `remember`-wrapped `onDeleteRequest` lambda | `MiniLogbookScreen` | The lambda captures coroutine scope and snackbar state; wrapping it in `remember` gives it a stable reference so `HistorySection` skips recomposition when nothing else changed |
+| `remember(entry.valueInMmol, unit)` / `remember(convertedValue)` per item | `HistorySection` `LazyColumn` items | Conversion and status classification are pure functions — memoised per item so they only re-run when their specific inputs change, not on every list recomposition |
+| `derivedStateOf` for `isDismissed` | Each `SwipeToDismissBox` item | Converts continuous `dismissState.currentValue` reads into a boolean that only invalidates downstream computations when the settled state actually flips |
+| `snapshotFlow + filter` instead of `LaunchedEffect(currentValue)` | `HistorySection` item | Fires only once when the swipe fully settles to `EndToStart`, not on every drag-offset change |
+| `Animatable + drawBehind` instead of `animateColorAsState` | `SwipeToDismissBox` background | Color animation runs entirely in the draw phase — zero recompositions per frame during the swipe |
+| `LaunchedEffect(itemCount)` + `rememberSaveable` guard | `HistorySection` | Scrolls the list to the top only when `itemCount` strictly increases (new entry added) **and** the list is scrolled down — skips the initial load emission and avoids unnecessary scroll calls |
 
 ### Swipe-to-delete + Undo
 
 The delete flow is designed to avoid full-screen recomposition:
-1. Each item's `LaunchedEffect` sets a `pendingDelete: Pair<GlucoseEntry, suspend () -> Unit>` in `MiniLogbookScreen` scope — only a state write, no suspend call
-2. A single `LaunchedEffect(pendingDelete)` at screen scope shows the Snackbar
+1. Each item's `LaunchedEffect` (via `snapshotFlow`) calls `onDeleteRequest` with a `Pair<GlucoseEntry, suspend () -> Unit>` — the lambda captures `dismissState::reset` so the item can animate back without any state hoisting
+2. `onDeleteRequest` (held at screen scope) launches a coroutine that shows the Snackbar
 3. On **Undo**: `dismissState.reset()` is called via the captured lambda — the item animates back
-4. On **dismiss**: `deleteEntry()` is called and `clearFocus()` prevents focus jumping to the input field
+4. On **dismiss**: `deleteEntry()` is called directly from the snackbar result handler
 
 ### Database encryption
 
@@ -192,7 +193,8 @@ Uses a custom `MiniLogbookTestRunner` + `TestApplication` to prevent the real Ko
 | UI | Jetpack Compose + Material 3 |
 | State | `StateFlow` + `collectAsStateWithLifecycle` |
 | Database | Room 2.8.4 |
-| Encryption | SQLCipher 4.13.0 + androidx.security.crypto 1.1.0 |
+| Pagination | Paging 3 (3.3.6) |
+| Encryption | SQLCipher 4.13.0 + Android Keystore (AES-256-GCM via `KeyGenerator` / `Cipher` directly) |
 | DI | Koin 4.1.1 |
 | Unit tests | JUnit 4 + Mockito + kotlinx-coroutines-test |
 | UI tests | Compose UI Test + AndroidJUnit4 |
