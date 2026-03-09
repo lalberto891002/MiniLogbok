@@ -11,7 +11,7 @@ import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
-import com.assessment.minilogbook.domain.service.GlucoseService
+import com.assessment.minilogbook.domain.service.IGlucoseService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,7 +30,7 @@ data class GlucoseState(
 
 class GlucoseViewModel(
     private val glucoseDao: GlucoseDao,
-    private val converter: GlucoseService
+    private val converter: IGlucoseService
 ) : ViewModel() {
 
     private val _unit = MutableStateFlow(GlucoseUnit.MMOL_L)

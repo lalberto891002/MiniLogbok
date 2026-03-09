@@ -6,6 +6,7 @@ import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
 import com.assessment.minilogbook.domain.service.GlucoseService
+import com.assessment.minilogbook.domain.service.IGlucoseService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +33,7 @@ class GlucoseViewModelTest(
 ) {
 
     private val glucoseDao: GlucoseDao = mock()
-    private val converter = GlucoseService()
+    private val converter: IGlucoseService = GlucoseService()
     private lateinit var viewModel: GlucoseViewModel
     private val averageFlow = MutableStateFlow<Double?>(null)
 

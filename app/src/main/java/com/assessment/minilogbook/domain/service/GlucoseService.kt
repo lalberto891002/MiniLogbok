@@ -12,7 +12,7 @@ import java.util.Locale
  * If the project grows in complexity, we can consider splitting this into separate classes (e.g., a Validator and a Converter),
  * but for now it is simple enough to keep it together.
  */
-class GlucoseService {
+class GlucoseService : IGlucoseService {
     companion object {
         /**
          * The constant factor used for converting between mmol/L and mg/dL.
@@ -30,7 +30,7 @@ class GlucoseService {
      *
      * In the future if needed we can move this logic to a separate validator class, but for now it is simple enough to keep it here.
      */
-    fun validateValue(value: Double?): Boolean {
+    override fun validateValue(value: Double?): Boolean {
         return value != null && value >= 0
     }
 
@@ -42,7 +42,7 @@ class GlucoseService {
      * @param toUnit The target unit for conversion.
      * @return The converted glucose value rounded to 4 decimal places.
      */
-    fun convertValue(value: Double, fromUnit: GlucoseUnit, toUnit: GlucoseUnit): Double {
+    override fun convertValue(value: Double, fromUnit: GlucoseUnit, toUnit: GlucoseUnit): Double {
         if (fromUnit == toUnit) return roundToFourDecimals(value)
 
         val converted = if (toUnit == GlucoseUnit.MG_DL) {
@@ -60,7 +60,7 @@ class GlucoseService {
      * @param currentUnit The unit the value is currently in.
      * @return The value converted to mmol/L rounded to 4 decimal places.
      */
-    fun toMmol(value: Double, currentUnit: GlucoseUnit): Double {
+    override fun toMmol(value: Double, currentUnit: GlucoseUnit): Double {
         val result = if (currentUnit == GlucoseUnit.MG_DL) {
             value / CONVERSION_FACTOR
         } else {
@@ -76,7 +76,7 @@ class GlucoseService {
      * @param targetUnit The unit to convert to.
      * @return The value converted to the target unit rounded to 4 decimal places.
      */
-    fun fromMmol(valueInMmol: Double, targetUnit: GlucoseUnit): Double {
+    override fun fromMmol(valueInMmol: Double, targetUnit: GlucoseUnit): Double {
         val result = if (targetUnit == GlucoseUnit.MG_DL) {
             valueInMmol * CONVERSION_FACTOR
         } else {
@@ -95,7 +95,7 @@ class GlucoseService {
      * @param currentUnit The unit the value is currently in.
      * @return The value in mmol/L rounded to 4 decimal places if valid, or `null` if the input is null or invalid.
      */
-    fun toMmolIfValid(value: Double?, currentUnit: GlucoseUnit): Double? {
+    override fun toMmolIfValid(value: Double?, currentUnit: GlucoseUnit): Double? {
         return value?.takeIf { validateValue(it) }?.let {
             toMmol(it, currentUnit)
         }
@@ -110,7 +110,7 @@ class GlucoseService {
      * @param valueInMmol The glucose value in mmol/L.
      * @return The corresponding [BloodGlucoseStatus].
      */
-    fun getGlucoseStatus(valueInMmol: Double): BloodGlucoseStatus {
+    override fun getGlucoseStatus(valueInMmol: Double): BloodGlucoseStatus {
         val valueInMgDl = valueInMmol * CONVERSION_FACTOR
         return when {
             valueInMgDl < 70.0 || valueInMgDl > 180.0 -> BloodGlucoseStatus.OUT_OF_RANGE
@@ -127,7 +127,7 @@ class GlucoseService {
      * @param unit The unit of the value (mmol/L or mg/dL).
      * @return The corresponding [BloodGlucoseStatus].
      */
-    fun getGlucoseStatusByUnit(value: Double, unit: GlucoseUnit): BloodGlucoseStatus {
+    override fun getGlucoseStatusByUnit(value: Double, unit: GlucoseUnit): BloodGlucoseStatus {
         val valueInMmol = toMmol(value, unit)
         return getGlucoseStatus(valueInMmol)
     }
