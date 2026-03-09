@@ -1,4 +1,4 @@
-package com.assessment.minilogbook.domain.usecase
+package com.assessment.minilogbook.domain.service
 
 import com.assessment.minilogbook.data.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus

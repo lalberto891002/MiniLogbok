@@ -1,7 +1,7 @@
 package com.assessment.minilogbook.di
 
 import com.assessment.minilogbook.data.GlucoseDatabase
-import com.assessment.minilogbook.domain.usecase.GlucoseService
+import com.assessment.minilogbook.domain.service.GlucoseService
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.factoryOf

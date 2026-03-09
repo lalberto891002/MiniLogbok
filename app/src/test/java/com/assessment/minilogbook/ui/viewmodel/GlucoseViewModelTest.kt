@@ -2,7 +2,7 @@ package com.assessment.minilogbook.ui.viewmodel
 
 import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseUnit
-import com.assessment.minilogbook.domain.usecase.GlucoseService
+import com.assessment.minilogbook.domain.service.GlucoseService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
