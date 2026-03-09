@@ -81,7 +81,6 @@ fun GlucoseInputField(
             text = unitText,
             fontSize = dimensionResource(R.dimen.text_unit_display).value.sp,
             fontWeight = FontWeight.Bold,
-            // Uses primary color (green in light, light green in dark) for visual consistency
             color = MaterialTheme.colorScheme.primary
         )
     }

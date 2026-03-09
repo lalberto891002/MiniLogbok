@@ -3,7 +3,6 @@ package com.assessment.minilogbook.domain.usecase
 import com.assessment.minilogbook.data.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import java.util.Locale
-import kotlin.math.round
 
 /**
  * Utility class for converting and validating blood glucose values.

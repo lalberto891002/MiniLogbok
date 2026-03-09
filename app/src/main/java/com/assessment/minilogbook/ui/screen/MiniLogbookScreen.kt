@@ -1,22 +1,50 @@
 package com.assessment.minilogbook.ui.screen
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector4D
-import androidx.compose.animation.core.TwoWayConverter
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.Animatable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.dimensionResource
@@ -34,7 +62,7 @@ import com.assessment.minilogbook.ui.util.getColorForStatus
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,7 +77,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
     val average = remember(entries, unit) { viewModel.getAverage(unit) }
 
     val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
     val windowInfo = LocalWindowInfo.current
     val density = LocalDensity.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -73,15 +100,14 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
         pendingDelete = null
     }
 
-    // Stable lambdas — same instance for the lifetime of the screen
-    val onUnitSelected: (GlucoseUnit) -> Unit = remember(viewModel) { { viewModel.onUnitChanged(it) } }
-    val onValueChange: (String) -> Unit = remember(viewModel) { { viewModel.onInputValueChanged(it) } }
-    val onSave: () -> Unit = remember(viewModel, keyboardController, focusManager) {
-        {
-            viewModel.saveEntry()
-            keyboardController?.hide()
-        }
+    val onUnitSelected: (GlucoseUnit) -> Unit = { viewModel.onUnitChanged(it) }
+    val onValueChange: (String) -> Unit = { viewModel.onInputValueChanged(it) }
+    val onSave: () -> Unit = {
+        viewModel.saveEntry()
+        keyboardController?.hide()
     }
+
+    // used by HistorySection to trigger the delete snackbar when an entry is swiped out or the delete button is tapped
     val onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit =
         remember { { pendingDelete = it } }
 
@@ -102,7 +128,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
             )
         }
     ) { padding ->
-
         if (state.isLoading) {
             Box(
                 modifier = Modifier
@@ -114,7 +139,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
             }
             return@Scaffold
         }
-
         if (isExpanded) {
             Row(
                 modifier = Modifier
@@ -222,9 +246,10 @@ private fun InputSection(
 
 @Composable
 private fun SummarySection(average: Double, unit: GlucoseUnit, viewModel: GlucoseViewModel) {
-    val avgInMmol = if (unit == GlucoseUnit.MG_DL) average / 18.0182 else average
+    val avgInMmol =  viewModel.convertValue(average, GlucoseUnit.MMOL_L)
     val status = viewModel.getGlucoseStatus(avgInMmol)
-    val unitLabel = if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)
+    val unitLabel =
+        if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)
 
     StatusValueCard(
         modifier = Modifier.fillMaxWidth(),
@@ -242,7 +267,10 @@ private fun HistorySection(
     viewModel: GlucoseViewModel,
     onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit
 ) {
-    Text(stringResource(R.string.label_previous_entries), style = MaterialTheme.typography.titleLarge)
+    Text(
+        stringResource(R.string.label_previous_entries),
+        style = MaterialTheme.typography.titleLarge
+    )
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
@@ -263,7 +291,9 @@ private fun HistorySection(
             val coroutineScope = rememberCoroutineScope()
 
             LaunchedEffect(dismissState) {
-                snapshotFlow { dismissState.currentValue }
+                snapshotFlow { dismissState.currentValue } //this flow emits the current swipe state
+                    // whenever it changes and allows to skip recompositions by filtering for the specific state we care about
+                    // (EndToStart) before triggering the delete snackbar.
                     .filter { it == SwipeToDismissBoxValue.EndToStart }
                     .collect {
                         onDeleteRequest(entry to dismissState::reset)
@@ -279,15 +309,7 @@ private fun HistorySection(
                 backgroundContent = {
                     val errorColor = MaterialTheme.colorScheme.errorContainer
                     val surfaceColor = MaterialTheme.colorScheme.surface
-                    val colorConverter: TwoWayConverter<Color, AnimationVector4D> = TwoWayConverter(
-                        convertToVector = { color ->
-                            AnimationVector4D(color.red, color.green, color.blue, color.alpha)
-                        },
-                        convertFromVector = { vector ->
-                            Color(vector.v1, vector.v2, vector.v3, vector.v4)
-                        }
-                    )
-                    val animatable = remember { Animatable(surfaceColor, colorConverter) }
+                    val animatable = remember { Animatable(surfaceColor) }
 
                     LaunchedEffect(isDismissed) {
                         animatable.animateTo(if (isDismissed) errorColor else surfaceColor)
