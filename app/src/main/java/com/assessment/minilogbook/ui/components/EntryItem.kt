@@ -13,7 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.data.GlucoseUnit
-import com.assessment.minilogbook.domain.service.GlucoseService
+import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import java.text.SimpleDateFormat
 import java.util.*
@@ -22,7 +22,8 @@ import java.util.*
  * A composable item that displays a single glucose entry.
  *
  * @param value The glucose value already converted to the current unit.
- * @param unit The unit of the displayed value, used to determine the glucose status color.
+ * @param unit The unit of the displayed value, used to format the label.
+ * @param status The pre-computed glucose status, provided by the caller (ViewModel).
  * @param timestamp The timestamp of the entry.
  * @param onDelete Called when the user taps the delete icon button.
  * @param modifier The modifier to be applied to the layout.
@@ -31,18 +32,13 @@ import java.util.*
 fun EntryItem(
     value: Double,
     unit: GlucoseUnit,
+    status: BloodGlucoseStatus,
     timestamp: Long,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val converter = remember { GlucoseService() }
-
-    // Memoize the glucose status using the already-converted value and its unit.
-    // Only recalculated when value or unit changes.
-    val status = remember(value, unit) { converter.getGlucoseStatusByUnit(value, unit) }
     val statusColor = getColorForStatus(status)
 
-    // Only recalculated when value or unit label changes, avoiding redundant string formatting.
     val unitLabel = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"
     val formattedValue = remember(value, unit) {
         String.format(Locale.getDefault(), "%.2f %s", value, unitLabel)

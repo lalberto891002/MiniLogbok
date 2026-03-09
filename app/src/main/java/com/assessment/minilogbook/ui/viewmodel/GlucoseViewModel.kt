@@ -113,4 +113,8 @@ class GlucoseViewModel(
         return converter.getGlucoseStatus(valueInMmol)
     }
 
+    fun getGlucoseStatusByUnit(value: Double, unit: GlucoseUnit): BloodGlucoseStatus {
+        return converter.getGlucoseStatusByUnit(value, unit)
+    }
+
 }

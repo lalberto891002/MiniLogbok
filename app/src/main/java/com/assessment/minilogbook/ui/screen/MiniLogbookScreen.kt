@@ -287,6 +287,10 @@ private fun HistorySection(
                 viewModel.convertValue(entry.valueInMmol, unit)
             }
 
+            val status = remember(convertedValue, unit) {
+                viewModel.getGlucoseStatusByUnit(convertedValue, unit)
+            }
+
             val dismissState = rememberSwipeToDismissBoxState()
             val isDismissed by remember {
                 derivedStateOf { dismissState.currentValue == SwipeToDismissBoxValue.EndToStart }
@@ -328,6 +332,7 @@ private fun HistorySection(
                     modifier = Modifier.fillMaxWidth(),
                     value = convertedValue,
                     unit = unit,
+                    status = status,
                     timestamp = entry.timestamp,
                     onDelete = {
                         coroutineScope.launch {

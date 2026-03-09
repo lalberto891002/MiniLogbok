@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
+import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -208,6 +209,78 @@ class GlucoseViewModelTest(
         assertEquals(false, viewModel.state.first().isLoading)
 
         job.cancel()
+    }
+
+    // --- getGlucoseStatus (value in mmol/L) ---
+
+    @Test
+    fun `getGlucoseStatus returns IN_TARGET for value in 90-140 mgDl range`() {
+        // 100 mg/dL → ~5.55 mmol/L
+        val valueInMmol = 100.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.IN_TARGET, viewModel.getGlucoseStatus(valueInMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OK for value in low ok range`() {
+        // 80 mg/dL → ~4.44 mmol/L
+        val valueInMmol = 80.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, viewModel.getGlucoseStatus(valueInMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OK for value in high ok range`() {
+        // 160 mg/dL → ~8.88 mmol/L
+        val valueInMmol = 160.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, viewModel.getGlucoseStatus(valueInMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OUT_OF_RANGE for value below 70 mgDl`() {
+        // 50 mg/dL → ~2.77 mmol/L
+        val valueInMmol = 50.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.getGlucoseStatus(valueInMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OUT_OF_RANGE for value above 180 mgDl`() {
+        // 200 mg/dL → ~11.10 mmol/L
+        val valueInMmol = 200.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.getGlucoseStatus(valueInMmol))
+    }
+
+    // --- getGlucoseStatusByUnit (value + explicit unit) ---
+
+    @Test
+    fun `getGlucoseStatusByUnit returns IN_TARGET for mgDl value in target range`() {
+        assertEquals(BloodGlucoseStatus.IN_TARGET, viewModel.getGlucoseStatusByUnit(100.0, GlucoseUnit.MG_DL))
+    }
+
+    @Test
+    fun `getGlucoseStatusByUnit returns IN_TARGET for mmolL value in target range`() {
+        val valueInMmol = 100.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.IN_TARGET, viewModel.getGlucoseStatusByUnit(valueInMmol, GlucoseUnit.MMOL_L))
+    }
+
+    @Test
+    fun `getGlucoseStatusByUnit returns OK for mgDl value in ok range`() {
+        assertEquals(BloodGlucoseStatus.OK, viewModel.getGlucoseStatusByUnit(160.0, GlucoseUnit.MG_DL))
+    }
+
+    @Test
+    fun `getGlucoseStatusByUnit returns OK for mmolL value in ok range`() {
+        val valueInMmol = 160.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, viewModel.getGlucoseStatusByUnit(valueInMmol, GlucoseUnit.MMOL_L))
+    }
+
+    @Test
+    fun `getGlucoseStatusByUnit returns OUT_OF_RANGE for mgDl value above 180`() {
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.getGlucoseStatusByUnit(200.0, GlucoseUnit.MG_DL))
+    }
+
+    @Test
+    fun `getGlucoseStatusByUnit returns OUT_OF_RANGE for mmolL value below 70 mgDl equivalent`() {
+        val valueInMmol = 50.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.getGlucoseStatusByUnit(valueInMmol, GlucoseUnit.MMOL_L))
     }
 }
 
