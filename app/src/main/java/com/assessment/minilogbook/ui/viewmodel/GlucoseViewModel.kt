@@ -105,4 +105,5 @@ class GlucoseViewModel(
     fun getGlucoseStatus(valueInMmol: Double): BloodGlucoseStatus {
         return converter.getGlucoseStatus(valueInMmol)
     }
+
 }
