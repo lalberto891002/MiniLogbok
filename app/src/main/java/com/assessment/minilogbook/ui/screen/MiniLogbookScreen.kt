@@ -30,12 +30,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -262,7 +267,8 @@ private fun HistorySection(
     pagedEntries: LazyPagingItems<GlucoseEntry>,
     unit: GlucoseUnit,
     viewModel: GlucoseViewModel,
-    onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit
+    onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit,
+    listState: LazyListState = rememberLazyListState()
 ) {
     Text(
         stringResource(R.string.label_previous_entries),
@@ -271,7 +277,18 @@ private fun HistorySection(
 
     val coroutineScope = rememberCoroutineScope()
 
+    var previousCount by rememberSaveable { mutableIntStateOf(0) }
+    val itemCount = pagedEntries.itemCount
+
+    LaunchedEffect(itemCount) {
+        if (itemCount > previousCount && listState.firstVisibleItemIndex > 0) {
+            listState.animateScrollToItem(0)
+        }
+        previousCount = itemCount
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
         contentPadding = PaddingValues(bottom = dimensionResource(R.dimen.padding_medium))

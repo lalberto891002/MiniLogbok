@@ -36,9 +36,6 @@ class GlucoseViewModel(
     private val _unit = MutableStateFlow(GlucoseUnit.MMOL_L)
     private val _inputValue = MutableStateFlow("")
     private val _errorMessage = MutableStateFlow<String?>(null)
-
-    // Exposed separately — collecting these never triggers a recomposition of
-    // sections that only read state (entries/unit)
     val inputValue: StateFlow<String> = _inputValue.asStateFlow()
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
@@ -50,7 +47,6 @@ class GlucoseViewModel(
         .flow
         .cachedIn(viewModelScope)
 
-    // combine only reacts to DB changes or unit toggle — never to keystrokes
     val state: StateFlow<GlucoseState> = combine(
         glucoseDao.getAverageValue(),
         _unit
