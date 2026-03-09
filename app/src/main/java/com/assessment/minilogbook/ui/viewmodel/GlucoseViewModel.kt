@@ -3,11 +3,16 @@ package com.assessment.minilogbook.ui.viewmodel
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.domain.service.GlucoseService
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,14 +23,14 @@ import kotlinx.coroutines.launch
 
 @Immutable
 data class GlucoseState(
-    val entries: List<GlucoseEntry> = emptyList(),
     val unit: GlucoseUnit = GlucoseUnit.MMOL_L,
+    val average: Double = 0.0,
     val isLoading: Boolean = true
 )
 
 class GlucoseViewModel(
     private val glucoseDao: GlucoseDao,
-    private val converter: GlucoseService = GlucoseService()
+    private val converter: GlucoseService
 ) : ViewModel() {
 
     private val _unit = MutableStateFlow(GlucoseUnit.MMOL_L)
@@ -37,14 +42,23 @@ class GlucoseViewModel(
     val inputValue: StateFlow<String> = _inputValue.asStateFlow()
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    val pagingDataFlow: Flow<PagingData<GlucoseEntry>> = Pager(
+        config = PagingConfig(pageSize = 20, enablePlaceholders = false)
+    ) {
+        glucoseDao.getAllEntries()
+    }
+        .flow
+        .cachedIn(viewModelScope)
+
     // combine only reacts to DB changes or unit toggle — never to keystrokes
     val state: StateFlow<GlucoseState> = combine(
-        glucoseDao.getAllEntries(),
+        glucoseDao.getAverageValue(),
         _unit
-    ) { entries, unit ->
+    ) { avgMmol, unit ->
+        val safeAvgMmol = avgMmol ?: 0.0
         GlucoseState(
-            entries = entries,
             unit = unit,
+            average = converter.fromMmol(safeAvgMmol, unit),
             isLoading = false
         )
     }.stateIn(
@@ -83,13 +97,6 @@ class GlucoseViewModel(
         } else {
             _errorMessage.value = "Please enter a valid value >= 0"
         }
-    }
-
-    fun getAverage(unit: GlucoseUnit): Double {
-        val entries = state.value.entries
-        if (entries.isEmpty()) return 0.0
-        val avgMmol = entries.map { it.valueInMmol }.average()
-        return converter.fromMmol(avgMmol, unit)
     }
 
     fun convertValue(valueInMmol: Double, toUnit: GlucoseUnit): Double {

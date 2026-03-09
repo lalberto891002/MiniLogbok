@@ -328,3 +328,4 @@ class MiniLogbookScreenTest {
         composeRule.onAllNodes(hasTestTag("entry_144.15 mg/dL")).assertCountEquals(0)
     }
 }
+

@@ -25,8 +25,12 @@ object PassphraseManager {
     private const val KEY_IV = "encryption_iv"
     private const val PASSPHRASE_SIZE = 32
 
-    fun getOrCreatePassphrase(context: Context): ByteArray {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    fun getOrCreatePassphrase(
+        context: Context,
+        prefsName: String = PREFS_NAME,
+        keyAlias: String = KEY_ALIAS
+    ): ByteArray {
+        val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
         val encryptedData = prefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
         val ivData = prefs.getString(KEY_IV, null)
 
@@ -34,28 +38,28 @@ object PassphraseManager {
             try {
                 val encrypted = Base64.decode(encryptedData, Base64.DEFAULT)
                 val iv = Base64.decode(ivData, Base64.DEFAULT)
-                return decrypt(encrypted, iv)
+                return decrypt(encrypted, iv, keyAlias)
             } catch (e: Exception) {
                 e.printStackTrace()
                 // Fallthrough to generate new passphrase if decryption fails
             }
         }
 
-        return generateAndSavePassphrase(context)
+        return generateAndSavePassphrase(context, prefsName, keyAlias)
     }
 
-    private fun generateAndSavePassphrase(context: Context): ByteArray {
+    private fun generateAndSavePassphrase(context: Context, prefsName: String, keyAlias: String): ByteArray {
         val passphrase = ByteArray(PASSPHRASE_SIZE)
         SecureRandom().nextBytes(passphrase)
 
-        val secretKey = getOrCreateKey()
+        val secretKey = getOrCreateKey(keyAlias)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, secretKey)
 
         val encrypted = cipher.doFinal(passphrase)
         val iv = cipher.iv
 
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
         prefs.edit()
             .putString(KEY_ENCRYPTED_PASSPHRASE, Base64.encodeToString(encrypted, Base64.DEFAULT))
             .putString(KEY_IV, Base64.encodeToString(iv, Base64.DEFAULT))
@@ -64,35 +68,35 @@ object PassphraseManager {
         return passphrase
     }
 
-    private fun decrypt(encrypted: ByteArray, iv: ByteArray): ByteArray {
-        val secretKey = getOrCreateKey()
+    private fun decrypt(encrypted: ByteArray, iv: ByteArray, keyAlias: String): ByteArray {
+        val secretKey = getOrCreateKey(keyAlias)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         val spec = GCMParameterSpec(128, iv)
         cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
         return cipher.doFinal(encrypted)
     }
 
-    private fun getOrCreateKey(): SecretKey {
+    private fun getOrCreateKey(keyAlias: String): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)
 
-        if (keyStore.containsAlias(KEY_ALIAS)) {
-            val entry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+        if (keyStore.containsAlias(keyAlias)) {
+            val entry = keyStore.getEntry(keyAlias, null) as? KeyStore.SecretKeyEntry
             if (entry != null) {
                 return entry.secretKey
             }
         }
 
-        return generateKey()
+        return generateKey(keyAlias)
     }
 
-    private fun generateKey(): SecretKey {
+    private fun generateKey(keyAlias: String): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
 
         // Try StrongBox first (API 28+ only, requires dedicated security chip)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
-                keyGenerator.init(buildKeyGenSpec(true))
+                keyGenerator.init(buildKeyGenSpec(true, keyAlias))
                 return keyGenerator.generateKey()
             } catch (e: Exception) {
                 // Fallback to standard TEE if StrongBox is not available
@@ -100,13 +104,13 @@ object PassphraseManager {
         }
 
         // Standard TEE-backed AES-256-GCM key
-        keyGenerator.init(buildKeyGenSpec(false))
+        keyGenerator.init(buildKeyGenSpec(false, keyAlias))
         return keyGenerator.generateKey()
     }
 
-    private fun buildKeyGenSpec(isStrongBox: Boolean): KeyGenParameterSpec {
+    private fun buildKeyGenSpec(isStrongBox: Boolean, keyAlias: String): KeyGenParameterSpec {
         val builder = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
+            keyAlias,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
         )
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)

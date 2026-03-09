@@ -1,6 +1,9 @@
 package com.assessment.minilogbook.ui.viewmodel
 
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
 import com.assessment.minilogbook.data.GlucoseDao
+import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.data.GlucoseUnit
 import com.assessment.minilogbook.domain.service.GlucoseService
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +34,7 @@ class GlucoseViewModelTest(
     private val glucoseDao: GlucoseDao = mock()
     private val converter = GlucoseService()
     private lateinit var viewModel: GlucoseViewModel
+    private val averageFlow = MutableStateFlow<Double?>(null)
 
     private val testDispatcher = StandardTestDispatcher()
 
@@ -49,7 +53,8 @@ class GlucoseViewModelTest(
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        whenever(glucoseDao.getAllEntries()).thenReturn(MutableStateFlow(emptyList()))
+        whenever(glucoseDao.getAverageValue()).thenReturn(averageFlow)
+        whenever(glucoseDao.getAllEntries()).thenReturn(FakePagingSource())
         viewModel = GlucoseViewModel(glucoseDao, converter)
     }
 
@@ -151,42 +156,63 @@ class GlucoseViewModelTest(
     }
 
     @Test
-    fun `getAverage returns 0 when no entries`() = runTest {
+    fun `state average returns 0 when db average is null`() = runTest {
         val job = collectState()
-        advanceUntilIdle()
-
-        val average = viewModel.getAverage(GlucoseUnit.MMOL_L)
-        assertEquals(0.0, average, 0.001)
-
-        job.cancel()
-    }
-
-    @Test
-    fun `initial state has isLoading true before Room emits`() = runTest {
-        val state = viewModel.state.value
-        assertEquals(true, state.isLoading)
-    }
-
-    @Test
-    fun `isLoading becomes false after Room emits first value`() = runTest {
-        val job = collectState()
+        averageFlow.emit(null)
         advanceUntilIdle()
 
         val state = viewModel.state.first()
-        assertEquals(false, state.isLoading)
+        assertEquals(0.0, state.average, 0.001)
 
         job.cancel()
     }
 
     @Test
-    fun `isLoading is false even when entries list is empty`() = runTest {
+    fun `state average reflects db value`() = runTest {
         val job = collectState()
+
+        // Simulate DB returning average of 10.0 mmol/L
+        averageFlow.emit(10.0)
         advanceUntilIdle()
 
-        val state = viewModel.state.first()
-        assertEquals(false, state.isLoading)
-        assertEquals(emptyList<Any>(), state.entries)
+        var state = viewModel.state.first()
+        // Default unit is MMOL_L, so average should be 10.0
+        assertEquals(10.0, state.average, 0.001)
+
+        // Switch unit to MG_DL
+        viewModel.onUnitChanged(GlucoseUnit.MG_DL)
+        advanceUntilIdle()
+
+        state = viewModel.state.first()
+        // 10.0 * 18.0182 = 180.182
+        assertEquals(180.182, state.average, 0.001)
 
         job.cancel()
+    }
+
+    @Test
+    fun `isLoading is initially true and becomes false after average emission`() = runTest {
+
+        // Initial state
+        assertEquals(true, viewModel.state.value.isLoading)
+
+        // Start collecting
+        val job = collectState()
+
+        // Emit a value from DB
+        averageFlow.emit(5.0)
+        advanceUntilIdle()
+
+        // State should now be loaded
+        assertEquals(false, viewModel.state.first().isLoading)
+
+        job.cancel()
+    }
+}
+
+class FakePagingSource : PagingSource<Int, GlucoseEntry>() {
+    override fun getRefreshKey(state: PagingState<Int, GlucoseEntry>): Int? = null
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, GlucoseEntry> {
+        return LoadResult.Page(emptyList(), null, null)
     }
 }

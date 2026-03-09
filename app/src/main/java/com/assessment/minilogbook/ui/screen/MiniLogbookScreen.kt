@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -71,10 +73,10 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
     val inputValue by viewModel.inputValue.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
-    val entries by remember { derivedStateOf { state.entries } }
+    val pagedEntries = viewModel.pagingDataFlow.collectAsLazyPagingItems()
     val unit by remember { derivedStateOf { state.unit } }
-
-    val average = remember(entries, unit) { viewModel.getAverage(unit) }
+    val average by remember { derivedStateOf { state.average } }
+    val isLoading by remember { derivedStateOf { state.isLoading } }
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val windowInfo = LocalWindowInfo.current
@@ -128,7 +130,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
             )
         }
     ) { padding ->
-        if (state.isLoading) {
+        if (isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -170,7 +172,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))
                 ) {
                     HistorySection(
-                        entries = entries,
+                        pagedEntries = pagedEntries,
                         unit = unit,
                         viewModel = viewModel,
                         onDeleteRequest = onDeleteRequest
@@ -196,7 +198,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                 )
                 SummarySection(average, unit, viewModel)
                 HistorySection(
-                    entries = entries,
+                    pagedEntries = pagedEntries,
                     unit = unit,
                     viewModel = viewModel,
                     onDeleteRequest = onDeleteRequest
@@ -262,7 +264,7 @@ private fun SummarySection(average: Double, unit: GlucoseUnit, viewModel: Glucos
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HistorySection(
-    entries: List<GlucoseEntry>,
+    pagedEntries: LazyPagingItems<GlucoseEntry>,
     unit: GlucoseUnit,
     viewModel: GlucoseViewModel,
     onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit
@@ -271,15 +273,18 @@ private fun HistorySection(
         stringResource(R.string.label_previous_entries),
         style = MaterialTheme.typography.titleLarge
     )
+
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
         contentPadding = PaddingValues(bottom = dimensionResource(R.dimen.padding_medium))
     ) {
-        itemsIndexed(
-            items = entries,
-            key = { _, entry -> entry.id }
-        ) { _, entry ->
+        items(
+            count = pagedEntries.itemCount,
+            key = { index -> pagedEntries[index]?.id ?: index }
+        ) { index ->
+            val entry = pagedEntries[index] ?: return@items
+
             val convertedValue = remember(entry.valueInMmol, unit) {
                 viewModel.convertValue(entry.valueInMmol, unit)
             }

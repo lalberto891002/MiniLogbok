@@ -2,6 +2,7 @@ package com.assessment.minilogbook.data
 
 import android.content.Context
 import androidx.room.*
+import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
@@ -19,7 +20,10 @@ data class GlucoseEntry(
 @Dao
 interface GlucoseDao {
     @Query("SELECT * FROM glucose_entries ORDER BY timestamp DESC")
-    fun getAllEntries(): Flow<List<GlucoseEntry>>
+    fun getAllEntries(): PagingSource<Int, GlucoseEntry>
+
+    @Query("SELECT AVG(valueInMmol) FROM glucose_entries")
+    fun getAverageValue(): Flow<Double?>
 
     @Insert
     suspend fun insert(entry: GlucoseEntry)
@@ -61,4 +65,3 @@ abstract class GlucoseDatabase : RoomDatabase() {
         }
     }
 }
-

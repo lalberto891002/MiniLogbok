@@ -3,6 +3,7 @@ package com.assessment.minilogbook.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
@@ -68,7 +69,16 @@ class GlucoseDaoTest(
     fun insertAndReadParameterizedEntry() = runBlocking {
         val entry = GlucoseEntry(valueInMmol = inputValue, timestamp = System.currentTimeMillis())
         glucoseDao.insert(entry)
-        val allEntries = glucoseDao.getAllEntries().first()
+
+        val pagingSource = glucoseDao.getAllEntries()
+        val loadResult = pagingSource.load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        )
+        val allEntries = (loadResult as PagingSource.LoadResult.Page).data
 
         // Find the entry we just inserted by its value
         val retrievedEntry = allEntries.find { it.valueInMmol == expectedValue }
@@ -84,7 +94,15 @@ class GlucoseDaoTest(
         glucoseDao.insert(entry1)
         glucoseDao.insert(entry2)
 
-        val allEntries = glucoseDao.getAllEntries().first()
+        val pagingSource = glucoseDao.getAllEntries()
+        val loadResult = pagingSource.load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        )
+        val allEntries = (loadResult as PagingSource.LoadResult.Page).data
 
         assertEquals(2, allEntries.size)
         // Check order (DESC by timestamp)
@@ -100,8 +118,26 @@ class GlucoseDaoTest(
 
         glucoseDao.deleteAll()
 
-        val allEntries = glucoseDao.getAllEntries().first()
+        val pagingSource = glucoseDao.getAllEntries()
+        val loadResult = pagingSource.load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        )
+        val allEntries = (loadResult as PagingSource.LoadResult.Page).data
+
         assertEquals(0, allEntries.size)
+    }
+
+    @Test
+    fun getAverageValueReturnsCorrectAverage() = runBlocking {
+        glucoseDao.insert(GlucoseEntry(valueInMmol = 10.0))
+        glucoseDao.insert(GlucoseEntry(valueInMmol = 20.0))
+
+        val avg = glucoseDao.getAverageValue().first()
+        assertEquals(15.0, avg ?: 0.0, 0.0)
     }
 
     @Test
@@ -111,12 +147,24 @@ class GlucoseDaoTest(
         glucoseDao.insert(GlucoseEntry(valueInMmol = 7.0, timestamp = 2000L))
 
         // Retrieve the inserted entries to get their auto-generated ids
-        val inserted = glucoseDao.getAllEntries().first()
+        val inserted = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        ) as PagingSource.LoadResult.Page).data
         val toDelete = inserted.first { it.valueInMmol == 3.0 }
 
         glucoseDao.delete(toDelete)
 
-        val remaining = glucoseDao.getAllEntries().first()
+        val remaining = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        ) as PagingSource.LoadResult.Page).data
         assertEquals(1, remaining.size)
         assertEquals(7.0, remaining[0].valueInMmol, 0.0)
     }
@@ -124,14 +172,27 @@ class GlucoseDaoTest(
     @Test
     @Throws(Exception::class)
     fun deleteSingleEntry_listBecomesEmptyWhenOnlyOneEntry() = runBlocking {
-        glucoseDao.insert(GlucoseEntry(valueInMmol = inputValue, timestamp = System.currentTimeMillis()))
+        val entry = GlucoseEntry(valueInMmol = inputValue, timestamp = System.currentTimeMillis())
+        glucoseDao.insert(entry)
 
-        val inserted = glucoseDao.getAllEntries().first()
+        val inserted = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        ) as PagingSource.LoadResult.Page).data
         assertEquals(1, inserted.size)
 
         glucoseDao.delete(inserted[0])
 
-        val remaining = glucoseDao.getAllEntries().first()
+        val remaining = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        ) as PagingSource.LoadResult.Page).data
         assertEquals(0, remaining.size)
     }
 
@@ -141,14 +202,28 @@ class GlucoseDaoTest(
         val timestamps = listOf(1000L, 2000L, 3000L)
         timestamps.forEach { glucoseDao.insert(GlucoseEntry(valueInMmol = it.toDouble(), timestamp = it)) }
 
-        val inserted = glucoseDao.getAllEntries().first()
+        val inserted = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        ) as PagingSource.LoadResult.Page).data
         val toDelete = inserted.first { it.timestamp == 2000L }
 
         glucoseDao.delete(toDelete)
 
-        val remaining = glucoseDao.getAllEntries().first()
+        val remaining = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        ) as PagingSource.LoadResult.Page).data
         assertEquals(2, remaining.size)
-        assertEquals(listOf(3000.0, 1000.0), remaining.map { it.valueInMmol })
+        // Since getEntry returns list ordered by timestamp DESC, 3000L should be first (index 0), then 1000L (index 1)
+        assertEquals(3000.0, remaining[0].valueInMmol, 0.0)
+        assertEquals(1000.0, remaining[1].valueInMmol, 0.0)
     }
 
     @Test
@@ -160,7 +235,13 @@ class GlucoseDaoTest(
         val phantom = GlucoseEntry(id = 999, valueInMmol = 5.0, timestamp = 1000L)
         glucoseDao.delete(phantom)
 
-        val remaining = glucoseDao.getAllEntries().first()
+        val remaining = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 10,
+                placeholdersEnabled = false
+            )
+        ) as PagingSource.LoadResult.Page).data
         assertEquals(1, remaining.size)
     }
 }

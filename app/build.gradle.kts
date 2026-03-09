@@ -55,6 +55,7 @@ dependencies {
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.room.paging)
     ksp(libs.androidx.room.compiler)
 
     // ViewModel Compose
@@ -69,6 +70,12 @@ dependencies {
     // Encrypted database — SQLCipher for Room
     implementation(libs.sqlcipher.android)
     implementation(libs.androidx.security.crypto)
+
+    // Paging
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
+    testImplementation(libs.androidx.paging.testing)
+    androidTestImplementation(libs.androidx.paging.testing)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)
