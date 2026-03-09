@@ -5,83 +5,118 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import androidx.core.content.edit
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import java.security.KeyStore
 import java.security.SecureRandom
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Manages the SQLCipher database passphrase.
+ * Manages the SQLCipher database passphrase using Android Keystore directly.
  *
- * Key storage strategy:
- * - Android 9+ (API 28) with StrongBox: key lives in a dedicated security chip (Titan M / SE)
- * - Android 6+ (API 23) without StrongBox: key lives in the TEE (hardware Keystore)
- * - Both cases: key never leaves the secure hardware in plaintext
- *
- * The passphrase itself is stored in [EncryptedSharedPreferences] encrypted with the Keystore key.
  */
 object PassphraseManager {
 
-    private const val PREFS_FILE = "db_secure_prefs"
-    private const val KEY_PASSPHRASE = "db_passphrase"
-    private const val PASSPHRASE_BYTE_LENGTH = 32
-    private const val MASTER_KEY_ALIAS = "minilogbook_master_key"
+    private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+    internal const val KEY_ALIAS = "MiniLogbook_MasterKey"
+    internal const val PREFS_NAME = "secure_storage"
+    private const val KEY_ENCRYPTED_PASSPHRASE = "encrypted_passphrase"
+    private const val KEY_IV = "encryption_iv"
+    private const val PASSPHRASE_SIZE = 32
 
     fun getOrCreatePassphrase(context: Context): ByteArray {
-        val masterKey = buildMasterKey(context)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val encryptedData = prefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
+        val ivData = prefs.getString(KEY_IV, null)
 
-        val prefs = EncryptedSharedPreferences.create(
-            context,
-            PREFS_FILE,
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-
-        val stored = prefs.getString(KEY_PASSPHRASE, null)
-        if (stored != null) {
-            return Base64.decode(stored, Base64.DEFAULT)
+        if (encryptedData != null && ivData != null) {
+            try {
+                val encrypted = Base64.decode(encryptedData, Base64.DEFAULT)
+                val iv = Base64.decode(ivData, Base64.DEFAULT)
+                return decrypt(encrypted, iv)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Fallthrough to generate new passphrase if decryption fails
+            }
         }
 
-        val passphrase = ByteArray(PASSPHRASE_BYTE_LENGTH)
+        return generateAndSavePassphrase(context)
+    }
+
+    private fun generateAndSavePassphrase(context: Context): ByteArray {
+        val passphrase = ByteArray(PASSPHRASE_SIZE)
         SecureRandom().nextBytes(passphrase)
-        prefs.edit {
-            putString(KEY_PASSPHRASE, Base64.encodeToString(passphrase, Base64.DEFAULT))
-        }
+
+        val secretKey = getOrCreateKey()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+
+        val encrypted = cipher.doFinal(passphrase)
+        val iv = cipher.iv
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(KEY_ENCRYPTED_PASSPHRASE, Base64.encodeToString(encrypted, Base64.DEFAULT))
+            .putString(KEY_IV, Base64.encodeToString(iv, Base64.DEFAULT))
+            .apply()
 
         return passphrase
     }
 
-    /**
-     * Builds a [MasterKey] backed by the strongest available hardware on the device:
-     * - API 28+: requests StrongBox (dedicated security chip, e.g. Titan M)
-     * - API 28+ without StrongBox / API < 28: falls back to TEE-backed Keystore key
-     */
-    private fun buildMasterKey(context: Context): MasterKey {
-        // Try StrongBox first (API 28+ only, requires dedicated security chip)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            try {
-                val spec = KeyGenParameterSpec.Builder(
-                    MASTER_KEY_ALIAS,
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-                )
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
-                    .setIsStrongBoxBacked(true)   // dedicated security chip
-                    .build()
+    private fun decrypt(encrypted: ByteArray, iv: ByteArray): ByteArray {
+        val secretKey = getOrCreateKey()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val spec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
+        return cipher.doFinal(encrypted)
+    }
 
-                return MasterKey.Builder(context, MASTER_KEY_ALIAS)
-                    .setKeyGenParameterSpec(spec)
-                    .build()
-            } catch (_: Exception) {
-                // StrongBox not available on this device — fall through to TEE
+    private fun getOrCreateKey(): SecretKey {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+
+        if (keyStore.containsAlias(KEY_ALIAS)) {
+            val entry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+            if (entry != null) {
+                return entry.secretKey
             }
         }
 
-        // Standard TEE-backed AES-256-GCM key (hardware Keystore, API 23+)
-        return MasterKey.Builder(context, MASTER_KEY_ALIAS)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
+        return generateKey()
+    }
+
+    private fun generateKey(): SecretKey {
+        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+
+        // Try StrongBox first (API 28+ only, requires dedicated security chip)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                keyGenerator.init(buildKeyGenSpec(true))
+                return keyGenerator.generateKey()
+            } catch (e: Exception) {
+                // Fallback to standard TEE if StrongBox is not available
+            }
+        }
+
+        // Standard TEE-backed AES-256-GCM key
+        keyGenerator.init(buildKeyGenSpec(false))
+        return keyGenerator.generateKey()
+    }
+
+    private fun buildKeyGenSpec(isStrongBox: Boolean): KeyGenParameterSpec {
+        val builder = KeyGenParameterSpec.Builder(
+            KEY_ALIAS,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            builder.setIsStrongBoxBacked(isStrongBox)
+        }
+
+        return builder.build()
     }
 }
