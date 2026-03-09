@@ -69,7 +69,6 @@ dependencies {
 
     // Encrypted database — SQLCipher for Room
     implementation(libs.sqlcipher.android)
-    implementation(libs.androidx.security.crypto)
 
     // Paging
     implementation(libs.androidx.paging.runtime)
