@@ -10,6 +10,7 @@ import com.assessment.minilogbook.MainActivity
 import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseDatabase
 import com.assessment.minilogbook.domain.service.GlucoseService
+import com.assessment.minilogbook.domain.service.IGlucoseService
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.Rule
@@ -23,6 +24,7 @@ import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.viewModelOf
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 /**
@@ -56,7 +58,7 @@ class MiniLogbookScreenTest {
                 modules(
                     module {
                         single<GlucoseDao> { dao }
-                        factoryOf(::GlucoseService)
+                        factoryOf(::GlucoseService) bind IGlucoseService::class
                         viewModelOf(::GlucoseViewModel)
                     }
                 )

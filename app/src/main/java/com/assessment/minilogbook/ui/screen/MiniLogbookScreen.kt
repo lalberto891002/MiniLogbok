@@ -71,9 +71,9 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
     val pagedEntries = viewModel.pagingDataFlow.collectAsLazyPagingItems()
-    val unit by remember { derivedStateOf { state.unit } }
-    val average by remember { derivedStateOf { state.average } }
-    val isLoading by remember { derivedStateOf { state.isLoading } }
+    val unit = state.unit
+    val average = state.average
+    val isLoading = state.isLoading
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val windowInfo = LocalWindowInfo.current
@@ -91,8 +91,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
         keyboardController?.hide()
     }
 
-    // Fix: Using a coroutine inside the request handler ensures that multiple deletes
-    // are queued correctly in the SnackbarHostState and none are lost due to cancellation.
     val onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit =
         remember {
             { (entry, resetDismiss) ->
@@ -272,6 +270,8 @@ private fun HistorySection(
         style = MaterialTheme.typography.titleLarge
     )
 
+    val coroutineScope = rememberCoroutineScope()
+
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
@@ -287,7 +287,7 @@ private fun HistorySection(
                 viewModel.convertValue(entry.valueInMmol, unit)
             }
 
-            val status = remember(convertedValue, unit) {
+            val status = remember(convertedValue) {
                 viewModel.getGlucoseStatusByUnit(convertedValue, unit)
             }
 
@@ -295,7 +295,6 @@ private fun HistorySection(
             val isDismissed by remember {
                 derivedStateOf { dismissState.currentValue == SwipeToDismissBoxValue.EndToStart }
             }
-            val coroutineScope = rememberCoroutineScope()
 
             LaunchedEffect(dismissState) {
                 snapshotFlow { dismissState.currentValue }

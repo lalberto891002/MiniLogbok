@@ -41,11 +41,13 @@ fun EntryItem(
 
     val unitLabel = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"
     val formattedValue = remember(value, unit) {
-        String.format(Locale.getDefault(), "%.2f %s", value, unitLabel)
+        String.format(Locale.US, "%.2f %s", value, unitLabel)
     }
 
-    val formattedDate = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-        .format(Date(timestamp))
+    val formattedDate = remember(timestamp) {
+        SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+            .format(Date(timestamp))
+    }
 
     Card(
         modifier = modifier.testTag("entry_$formattedValue"),
