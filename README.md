@@ -68,7 +68,8 @@ app/
 ### ViewModel layer
 
 `GlucoseViewModel` exposes:
-- `state: StateFlow<GlucoseState>` — combines `entries + unit` from Room/`_unit` only. **Never triggered by keystrokes.**
+- `state: StateFlow<GlucoseState>` — combines `average + unit` from Room/`_unit` only. **Never triggered by keystrokes.**
+- `pagingDataFlow: Flow<PagingData<GlucoseEntry>>` — Paging 3 flow for list items.
 - `inputValue: StateFlow<String>` — separate flow for the text field value
 - `errorMessage: StateFlow<String?>` — only updated when `saveEntry()` is called
 
