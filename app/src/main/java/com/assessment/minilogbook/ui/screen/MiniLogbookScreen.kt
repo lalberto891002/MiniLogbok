@@ -81,7 +81,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
         {
             viewModel.saveEntry()
             keyboardController?.hide()
-            focusManager.clearFocus()
         }
     }
     val onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit =

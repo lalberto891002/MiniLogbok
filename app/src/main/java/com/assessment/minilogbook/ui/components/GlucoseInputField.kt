@@ -2,13 +2,14 @@ package com.assessment.minilogbook.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
@@ -38,6 +39,29 @@ fun GlucoseInputField(
     modifier: Modifier = Modifier,
     errorMessage: String? = null,
 ) {
+    val isError = errorMessage != null
+    val labelText = stringResource(R.string.label_enter_bg_value)
+
+    // Stable lambdas to avoid unnecessary recomposition of OutlinedTextField
+    val label: @Composable () -> Unit = remember(labelText) { { Text(labelText) } }
+
+    val supporting: (@Composable () -> Unit)? = remember(errorMessage) {
+        errorMessage?.let { msg -> { Text(msg) } }
+    }
+
+    val keyboardOptions = remember {
+        KeyboardOptions(
+            keyboardType = KeyboardType.Decimal,
+            imeAction = ImeAction.Done
+        )
+    }
+
+    val onDoneState = rememberUpdatedState(onDone)
+
+    val keyboardActions = remember {
+        KeyboardActions(onDone = { onDoneState.value() })
+    }
+
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -46,17 +70,12 @@ fun GlucoseInputField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            label = { Text(stringResource(R.string.label_enter_bg_value)) },
+            label = label,
             modifier = Modifier.weight(1f),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Decimal,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = { onDone() }
-            ),
-            isError = errorMessage != null,
-            supportingText = { errorMessage?.let { Text(it) } }
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            isError = isError,
+            supportingText = supporting
         )
         Text(
             text = unitText,
