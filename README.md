@@ -26,7 +26,7 @@ app/
 ├── data/           — Room entities, DAO, database, encryption
 ├── domain/         — Business logic (conversion, validation, status)
 │   ├── model/      — BloodGlucoseStatus enum
-│   └── usecase/    — GlucoseConverter
+│   └── service/    — GlucoseService
 ├── di/             — Koin dependency injection module
 └── ui/
     ├── components/ — Reusable Composables
@@ -49,7 +49,7 @@ app/
 
 ### Domain layer
 
-`GlucoseConverter` encapsulates all conversion and validation logic:
+`GlucoseService` encapsulates all conversion and validation logic:
 - `validateValue(Double?)` — rejects null and negative values
 - `toMmolIfValid(Double?, GlucoseUnit)` — validates and converts to mmol/L
 - `convertValue(Double, GlucoseUnit, GlucoseUnit)` — bidirectional conversion
@@ -67,8 +67,9 @@ app/
 
 ### ViewModel layer
 
-`GlucoseViewModel` exposes:
-- `state: StateFlow<GlucoseState>` — combines `entries + unit` from Room/`_unit` only. **Never triggered by keystrokes.**
+`GlucoseViewModel` consumes `GlucoseService` (injected via Koin constructor injection) to handle business logic like unit conversion and status determination. It exposes:
+- `state: StateFlow<GlucoseState>` — combines `average + unit` from Room/`_unit` only. **Never triggered by keystrokes.**
+- `pagingDataFlow: Flow<PagingData<GlucoseEntry>>` — Paging 3 flow for list items.
 - `inputValue: StateFlow<String>` — separate flow for the text field value
 - `errorMessage: StateFlow<String?>` — only updated when `saveEntry()` is called
 
@@ -132,7 +133,7 @@ Koin is used for DI via `AppModule`:
 ```
 GlucoseDatabase (singleton)
     └── GlucoseDao (singleton)
-GlucoseConverter (factory)
+GlucoseService (factory)
 GlucoseViewModel (viewModel)
 ```
 
@@ -144,7 +145,7 @@ GlucoseViewModel (viewModel)
 
 | Test class | Coverage |
 |---|---|
-| `GlucoseConverterTest` | Validation, mmol↔mg/dL conversion, status thresholds for both units |
+| `GlucoseServiceTest` | Validation, mmol↔mg/dL conversion, status thresholds for both units |
 | `GlucoseViewModelTest` | Input value updates, error on invalid/negative save, successful save clears input, unit conversion of input value, average calculation, `isLoading` lifecycle |
 
 ### Instrumented DAO tests (`src/androidTest`)
