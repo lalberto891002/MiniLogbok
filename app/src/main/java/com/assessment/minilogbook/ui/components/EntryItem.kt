@@ -39,7 +39,7 @@ fun EntryItem(
 ) {
     val statusColor = getColorForStatus(status)
 
-    val unitLabel = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"
+    val unitLabel = if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)
     val formattedValue = remember(value, unit) {
         String.format(Locale.US, "%.2f %s", value, unitLabel)
     }
