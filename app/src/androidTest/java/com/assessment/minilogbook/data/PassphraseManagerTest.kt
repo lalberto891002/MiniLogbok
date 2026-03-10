@@ -7,6 +7,9 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.KeyStore
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.junit.Before
 
 @RunWith(AndroidJUnit4::class)
@@ -74,5 +77,47 @@ class PassphraseManagerTest {
         val keyStore = KeyStore.getInstance("AndroidKeyStore")
         keyStore.load(null)
         assertTrue(keyStore.containsAlias(TEST_KEY_ALIAS))
+    }
+
+    @Test
+    fun getOrCreatePassphrase_isSafeUnderConcurrency() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val threadCount = 10
+        val executor = Executors.newFixedThreadPool(threadCount)
+        val startLatch = CountDownLatch(1)
+        val results = Array<ByteArray?>(threadCount) { null }
+
+        // All threads wait at the gate, then rush in simultaneously
+        val futures = (0 until threadCount).map { i ->
+            executor.submit {
+                startLatch.await()
+                results[i] = PassphraseManager.getOrCreatePassphrase(
+                    context, TEST_PREFS_NAME, TEST_KEY_ALIAS
+                )
+            }
+        }
+
+        startLatch.countDown()
+        executor.shutdown()
+        assertTrue("Threads did not finish in time", executor.awaitTermination(30, TimeUnit.SECONDS))
+        futures.forEach { it.get() }
+
+        val first = results[0]!!
+        for (i in 1 until threadCount) {
+            assertArrayEquals(
+                "Thread $i got a different passphrase — race condition detected",
+                first,
+                results[i]
+            )
+        }
+
+        // The blob stored in prefs must decrypt to exactly the same passphrase
+        // that all threads received — proving only one passphrase was ever generated.
+        val persisted = PassphraseManager.getOrCreatePassphrase(context, TEST_PREFS_NAME, TEST_KEY_ALIAS)
+        assertArrayEquals(
+            "Persisted passphrase does not match the one returned to threads — blob was overwritten",
+            first,
+            persisted
+        )
     }
 }

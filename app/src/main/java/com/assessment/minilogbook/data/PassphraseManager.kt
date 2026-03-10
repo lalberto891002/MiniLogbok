@@ -25,11 +25,18 @@ object PassphraseManager {
     private const val KEY_IV = "encryption_iv"
     private const val PASSPHRASE_SIZE = 32
 
+    /**
+     * Lock that serialises all read-or-generate operations so that two threads
+     * cannot both observe encryptedData == null and each generate a different
+     * passphrase, which would cause a decryption mismatch on the next launch.
+     */
+    private val lock = Any()
+
     fun getOrCreatePassphrase(
         context: Context,
         prefsName: String = PREFS_NAME,
         keyAlias: String = KEY_ALIAS
-    ): ByteArray {
+    ): ByteArray = synchronized(lock) {
         val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
         val encryptedData = prefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
         val ivData = prefs.getString(KEY_IV, null)
@@ -38,14 +45,14 @@ object PassphraseManager {
             try {
                 val encrypted = Base64.decode(encryptedData, Base64.DEFAULT)
                 val iv = Base64.decode(ivData, Base64.DEFAULT)
-                return decrypt(encrypted, iv, keyAlias)
+                return@synchronized decrypt(encrypted, iv, keyAlias)
             } catch (e: Exception) {
                 e.printStackTrace()
                 // Fallthrough to generate new passphrase if decryption fails
             }
         }
 
-        return generateAndSavePassphrase(context, prefsName, keyAlias)
+        generateAndSavePassphrase(context, prefsName, keyAlias)
     }
 
     private fun generateAndSavePassphrase(context: Context, prefsName: String, keyAlias: String): ByteArray {
@@ -63,7 +70,7 @@ object PassphraseManager {
         prefs.edit()
             .putString(KEY_ENCRYPTED_PASSPHRASE, Base64.encodeToString(encrypted, Base64.DEFAULT))
             .putString(KEY_IV, Base64.encodeToString(iv, Base64.DEFAULT))
-            .apply()
+            .commit()
 
         return passphrase
     }
