@@ -66,9 +66,9 @@ class GlucoseViewModel(
     fun onUnitChanged(newUnit: GlucoseUnit) {
         val currentInput = _inputValue.value
         val convertedInput = if (currentInput.isNotEmpty()) {
-            val value = currentInput.toDoubleOrNull() ?: 0.0
+            val value = currentInput.toDoubleOrNull()
             val fromUnit = if (newUnit == GlucoseUnit.MG_DL) GlucoseUnit.MMOL_L else GlucoseUnit.MG_DL
-            _glucoseService.convertValue(value, fromUnit, newUnit).toString()
+            value?.let { _glucoseService.convertValue(it, fromUnit, newUnit).toString() } ?: currentInput
         } else ""
 
         _unit.value = newUnit
