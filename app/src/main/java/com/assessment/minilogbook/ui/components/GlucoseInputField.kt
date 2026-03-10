@@ -50,35 +50,23 @@ fun GlucoseInputField(
     // Resolve the active accent colour once — driven only by isError.
     val accentColor = if (isError) errorColor else primaryColor
 
-    // OutlinedTextFieldDefaults.colors() is @Composable, so it must be called in composition.
-    // We pass accentColor as the key so the resulting TextFieldColors object is reused across
-    // recompositions as long as the error state does not change.
-    val colors = remember(accentColor) {
-        // This lambda is NOT @Composable — colors are closed over from the outer scope.
-        accentColor // placeholder; actual call is outside the lambda (see below)
-    }.let {
-        OutlinedTextFieldDefaults.colors(
-            focusedLabelColor = accentColor,
-            unfocusedLabelColor = accentColor,
-            focusedBorderColor = accentColor,
-            unfocusedBorderColor = accentColor,
-            cursorColor = accentColor,
-        )
-    }
+    val colors = OutlinedTextFieldDefaults.colors(
+        focusedLabelColor = accentColor,
+        unfocusedLabelColor = accentColor,
+        focusedBorderColor = accentColor,
+        unfocusedBorderColor = accentColor,
+        cursorColor = accentColor,
+    )
 
     // labelStyle resolved once per error-state change so the label lambda is fully stable.
     val resolvedLabelStyle = remember(accentColor) {
         labelStyle.copy(color = accentColor)
     }
 
-    // Stable lambdas to avoid unnecessary recomposition of OutlinedTextField
-    val label: @Composable () -> Unit = remember(labelText, resolvedLabelStyle) {
-        { Text(text = labelText, style = resolvedLabelStyle) }
-    }
+    val label: @Composable () -> Unit = { Text(text = labelText, style = resolvedLabelStyle) }
 
-    val supporting: (@Composable () -> Unit)? = remember(errorMessage) {
+    val supporting: (@Composable () -> Unit)? =
         errorMessage?.let { msg -> { Text(msg) } }
-    }
 
     val keyboardOptions = KeyboardOptions(
         keyboardType = KeyboardType.Decimal,
