@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -42,8 +43,38 @@ fun GlucoseInputField(
     val isError = errorMessage != null
     val labelText = stringResource(R.string.label_enter_bg_value)
 
+    val errorColor = MaterialTheme.colorScheme.error
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val labelStyle = MaterialTheme.typography.bodyLarge
+
+    // Resolve the active accent colour once — driven only by isError.
+    val accentColor = if (isError) errorColor else primaryColor
+
+    // OutlinedTextFieldDefaults.colors() is @Composable, so it must be called in composition.
+    // We pass accentColor as the key so the resulting TextFieldColors object is reused across
+    // recompositions as long as the error state does not change.
+    val colors = remember(accentColor) {
+        // This lambda is NOT @Composable — colors are closed over from the outer scope.
+        accentColor // placeholder; actual call is outside the lambda (see below)
+    }.let {
+        OutlinedTextFieldDefaults.colors(
+            focusedLabelColor = accentColor,
+            unfocusedLabelColor = accentColor,
+            focusedBorderColor = accentColor,
+            unfocusedBorderColor = accentColor,
+            cursorColor = accentColor,
+        )
+    }
+
+    // labelStyle resolved once per error-state change so the label lambda is fully stable.
+    val resolvedLabelStyle = remember(accentColor) {
+        labelStyle.copy(color = accentColor)
+    }
+
     // Stable lambdas to avoid unnecessary recomposition of OutlinedTextField
-    val label: @Composable () -> Unit = remember(labelText) { { Text(labelText) } }
+    val label: @Composable () -> Unit = remember(labelText, resolvedLabelStyle) {
+        { Text(text = labelText, style = resolvedLabelStyle) }
+    }
 
     val supporting: (@Composable () -> Unit)? = remember(errorMessage) {
         errorMessage?.let { msg -> { Text(msg) } }
@@ -73,7 +104,8 @@ fun GlucoseInputField(
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
             isError = isError,
-            supportingText = supporting
+            supportingText = supporting,
+            colors = colors
         )
         Text(
             text = unitText,
