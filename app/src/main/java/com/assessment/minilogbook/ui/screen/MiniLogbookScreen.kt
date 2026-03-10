@@ -33,6 +33,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -127,6 +128,15 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
         windowInfo.containerSize.width.toDp() > 600.dp
     }
 
+    // rotationKey always increments on every orientation change so the key(rotationKey)
+    // wrapping HistorySection always gets a fresh value — Compose discards the old
+    // composition and all dismissStates reset to Settled. The snackbar is also dismissed.
+    var rotationKey by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(isExpanded) {
+        rotationKey++
+        snackbarHostState.currentSnackbarData?.dismiss()
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -181,13 +191,15 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))
                 ) {
-                    HistorySection(
-                        pagedEntries = glucoseEntries,
-                        unit = unit,
-                        onConvertValue = onConvertValue,
-                        onGetStatus = onGetStatus,
-                        onDeleteRequest = onDeleteRequest
-                    )
+                    key(rotationKey) {
+                        HistorySection(
+                            pagedEntries = glucoseEntries,
+                            unit = unit,
+                            onConvertValue = onConvertValue,
+                            onGetStatus = onGetStatus,
+                            onDeleteRequest = onDeleteRequest
+                        )
+                    }
                 }
             }
         } else {
@@ -208,13 +220,15 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     onSave = onSave
                 )
                 SummarySection(average = average, unit = unit, status = summaryStatus)
-                HistorySection(
-                    pagedEntries = glucoseEntries,
-                    unit = unit,
-                    onConvertValue = onConvertValue,
-                    onGetStatus = onGetStatus,
-                    onDeleteRequest = onDeleteRequest
-                )
+                key(rotationKey) {
+                    HistorySection(
+                        pagedEntries = glucoseEntries,
+                        unit = unit,
+                        onConvertValue = onConvertValue,
+                        onGetStatus = onGetStatus,
+                        onDeleteRequest = onDeleteRequest
+                    )
+                }
             }
         }
     }
