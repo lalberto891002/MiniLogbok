@@ -67,13 +67,13 @@ app/
 
 ### ViewModel layer
 
-`GlucoseViewModel` consumes `GlucoseService` (injected via Koin constructor injection) to handle business logic like unit conversion and status determination. It exposes:
-- `state: StateFlow<GlucoseState>` — combines `average + unit` from Room/`_unit` only. **Never triggered by keystrokes.**
-- `pagingDataFlow: Flow<PagingData<GlucoseEntry>>` — Paging 3 flow for list items.
+`GlucoseViewModel` consumes `IGlucoseService` (injected via Koin constructor injection) to handle business logic like unit conversion and status determination. It exposes:
+- `glucoseState: StateFlow<GlucoseState>` — combines `average + unit` from Room/`_unit` only. **Never triggered by keystrokes.**
+- `glucoseEntries: Flow<PagingData<GlucoseEntry>>` — Paging 3 flow for list items, cached in `viewModelScope`.
 - `inputValue: StateFlow<String>` — separate flow for the text field value
-- `errorMessage: StateFlow<String?>` — only updated when `saveEntry()` is called
+- `displayErrorMessage: StateFlow<Boolean>` — set to `true` when `saveEntry()` fails validation, reset to `false` on any input change or successful save
 
-**Key design decision:** `inputValue` and `errorMessage` were removed from the `combine()` operator so that typing in the input field never triggers a Room query emission or recomposes the entries list. Each `StateFlow` is collected independently in the screen.
+**Key design decision:** `inputValue` and `displayErrorMessage` are kept outside the `combine()` operator so that typing in the input field never triggers a Room query emission or recomposes the entries list. Each `StateFlow` is collected independently in the screen.
 
 ### UI layer
 
