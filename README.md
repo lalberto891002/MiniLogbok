@@ -97,6 +97,7 @@ app/
 | `snapshotFlow + filter` instead of `LaunchedEffect(currentValue)` | `HistorySection` item | Fires only once when the swipe fully settles to `EndToStart`, not on every drag-offset change |
 | `Animatable + drawBehind` instead of `animateColorAsState` | `SwipeToDismissBox` background | Color animation runs entirely in the draw phase — zero recompositions per frame during the swipe |
 | `LaunchedEffect(itemCount)` + `rememberSaveable` guard | `HistorySection` | Scrolls the list to the top only when `itemCount` strictly increases (new entry added) **and** the list is scrolled down — skips the initial load emission and avoids unnecessary scroll calls |
+| `remember(isError)` for `colors`, `labelStyle`, and slot lambdas | `GlucoseInputField` | Memoises `TextFieldColors`, the label `TextStyle`, and the `label`/`supportingText` slot lambdas so they are only recreated when the error state changes, not on every parent recomposition |
 
 ### Swipe-to-delete + Undo
 
