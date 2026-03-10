@@ -117,6 +117,61 @@ class GlucoseServiceTest {
         assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, converter.getGlucoseStatus(valueMmolLow))
     }
 
+    // --- Boundary-value tests (critical for a medical app) ---
+    // The when-clause uses strict < and >, so boundaries fall as follows:
+    //   70.0  → not < 70  → first branch fails → 70 < 90 → OK
+    //   90.0  → not < 70  → first branch fails → not < 90, not > 140 → IN_TARGET
+    //  140.0  → not > 180 → first branch fails → not < 90, not > 140 → IN_TARGET
+    //  180.0  → not > 180 → first branch fails → 180 > 140 → OK
+
+    @Test
+    fun `getGlucoseStatus returns OK at lower boundary 70 mg dL`() {
+        val valueMmol = 70.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, converter.getGlucoseStatus(valueMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns IN_TARGET at lower target boundary 90 mg dL`() {
+        val valueMmol = 90.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.IN_TARGET, converter.getGlucoseStatus(valueMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns IN_TARGET at upper target boundary 140 mg dL`() {
+        val valueMmol = 140.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.IN_TARGET, converter.getGlucoseStatus(valueMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OK at upper boundary 180 mg dL`() {
+        val valueMmol = 180.0 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, converter.getGlucoseStatus(valueMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OUT_OF_RANGE just below lower boundary 69 99 mg dL`() {
+        val valueMmol = 69.99 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, converter.getGlucoseStatus(valueMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OUT_OF_RANGE just above upper boundary 180 01 mg dL`() {
+        val valueMmol = 180.01 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, converter.getGlucoseStatus(valueMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OK just below lower target boundary 89 99 mg dL`() {
+        val valueMmol = 89.99 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, converter.getGlucoseStatus(valueMmol))
+    }
+
+    @Test
+    fun `getGlucoseStatus returns OK just above upper target boundary 140 01 mg dL`() {
+        val valueMmol = 140.01 / GlucoseService.CONVERSION_FACTOR
+        assertEquals(BloodGlucoseStatus.OK, converter.getGlucoseStatus(valueMmol))
+    }
+
     @Test
     fun `getGlucoseStatusByUnit correctly assesses status for both units`() {
         // Test Target range (90-140 mg/dL)
