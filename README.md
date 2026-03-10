@@ -80,8 +80,10 @@ app/
 `MiniLogbookScreen` is split into three private composables to minimise recomposition scope:
 
 - **`InputSection`** — receives individual slices (`inputValue`, `unit`, `errorMessage`) and stable lambda references; only recomposes when its own data changes
-- **`SummarySection`** — displays the average card; only recomposes when `entries` or `unit` change
-- **`HistorySection`** — `LazyColumn` with `SwipeToDismissBox` per item; auto-scrolls to the top when a new entry is added
+- **`SummarySection`** — receives `average`, `unit`, and an already-computed `status: BloodGlucoseStatus`; purely declarative with no ViewModel dependency — previewable in isolation
+- **`HistorySection`** — receives `onConvertValue` and `onGetStatus` lambdas instead of the ViewModel; `LazyColumn` with `SwipeToDismissBox` per item; auto-scrolls to the top when a new entry is added
+
+All three private composables follow **state hoisting**: they receive only the data and lambdas they need, making them independently testable and previewable without a real ViewModel.
 
 ---
 
@@ -92,7 +94,9 @@ app/
 | Technique | Where | Why |
 |---|---|---|
 | `remember`-wrapped `onDeleteRequest` lambda | `MiniLogbookScreen` | The lambda captures coroutine scope and snackbar state; wrapping it in `remember` gives it a stable reference so `HistorySection` skips recomposition when nothing else changed |
-| `remember(entry.valueInMmol, unit)` / `remember(convertedValue)` per item | `HistorySection` `LazyColumn` items | Conversion and status classification are pure functions — memoised per item so they only re-run when their specific inputs change, not on every list recomposition |
+| `remember`-wrapped `onConvertValue` / `onGetStatus` lambdas | `MiniLogbookScreen` | Wrapping ViewModel method references in `remember` (no keys) produces stable function references; `HistorySection` receives the same instance across recompositions and is never recomposed unnecessarily |
+| `remember(average, unit)` for `summaryStatus` | `MiniLogbookScreen` | Status is derived once at the screen level and passed down as a plain value; `SummarySection` is fully declarative and skips recomposition unless `average` or `unit` actually change |
+| `remember(entry.valueInMmol, unit)` / `remember(convertedValue, unit)` per item | `HistorySection` `LazyColumn` items | Conversion and status classification are pure functions — memoised per item so they only re-run when their specific inputs change, not on every list recomposition |
 | `derivedStateOf` for `isDismissed` | Each `SwipeToDismissBox` item | Converts continuous `dismissState.currentValue` reads into a boolean that only invalidates downstream computations when the settled state actually flips |
 | `snapshotFlow + filter` instead of `LaunchedEffect(currentValue)` | `HistorySection` item | Fires only once when the swipe fully settles to `EndToStart`, not on every drag-offset change |
 | `Animatable + drawBehind` instead of `animateColorAsState` | `SwipeToDismissBox` background | Color animation runs entirely in the draw phase — zero recompositions per frame during the swipe |

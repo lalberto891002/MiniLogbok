@@ -62,6 +62,7 @@ import com.assessment.minilogbook.ui.components.EntryItem
 import com.assessment.minilogbook.ui.components.GlucoseInputField
 import com.assessment.minilogbook.ui.components.GlucoseUnitSelector
 import com.assessment.minilogbook.ui.components.StatusValueCard
+import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import kotlinx.coroutines.flow.filter
@@ -113,6 +114,14 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                 }
             }
         }
+
+    val onConvertValue: (Double, GlucoseUnit) -> Double =
+        remember { { valueInMmol, toUnit -> viewModel.convertValue(valueInMmol, toUnit) } }
+
+    val onGetStatus: (Double, GlucoseUnit) -> BloodGlucoseStatus =
+        remember { { value, unit -> viewModel.getGlucoseStatusByUnit(value, unit) } }
+
+    val summaryStatus = remember(average, unit) { viewModel.getGlucoseStatusByUnit(average, unit) }
 
     val isExpanded = with(density) {
         windowInfo.containerSize.width.toDp() > 600.dp
@@ -166,7 +175,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                         onValueChange = onValueChange,
                         onSave = onSave
                     )
-                    SummarySection(average, unit, viewModel)
+                    SummarySection(average = average, unit = unit, status = summaryStatus)
                 }
                 Column(
                     modifier = Modifier.weight(1f),
@@ -175,7 +184,8 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     HistorySection(
                         pagedEntries = glucoseEntries,
                         unit = unit,
-                        viewModel = viewModel,
+                        onConvertValue = onConvertValue,
+                        onGetStatus = onGetStatus,
                         onDeleteRequest = onDeleteRequest
                     )
                 }
@@ -197,11 +207,12 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     onValueChange = onValueChange,
                     onSave = onSave
                 )
-                SummarySection(average, unit, viewModel)
+                SummarySection(average = average, unit = unit, status = summaryStatus)
                 HistorySection(
                     pagedEntries = glucoseEntries,
                     unit = unit,
-                    viewModel = viewModel,
+                    onConvertValue = onConvertValue,
+                    onGetStatus = onGetStatus,
                     onDeleteRequest = onDeleteRequest
                 )
             }
@@ -248,8 +259,7 @@ private fun InputSection(
 }
 
 @Composable
-private fun SummarySection(average: Double, unit: GlucoseUnit, viewModel: GlucoseViewModel) {
-    val status = viewModel.getGlucoseStatusByUnit(average, unit)
+private fun SummarySection(average: Double, unit: GlucoseUnit, status: BloodGlucoseStatus) {
     val unitLabel =
         if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)
 
@@ -266,7 +276,8 @@ private fun SummarySection(average: Double, unit: GlucoseUnit, viewModel: Glucos
 private fun HistorySection(
     pagedEntries: LazyPagingItems<GlucoseEntry>,
     unit: GlucoseUnit,
-    viewModel: GlucoseViewModel,
+    onConvertValue: (Double, GlucoseUnit) -> Double,
+    onGetStatus: (Double, GlucoseUnit) -> BloodGlucoseStatus,
     onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit,
     listState: LazyListState = rememberLazyListState()
 ) {
@@ -300,11 +311,11 @@ private fun HistorySection(
             val entry = pagedEntries[index] ?: return@items
 
             val convertedValue = remember(entry.valueInMmol, unit) {
-                viewModel.convertValue(entry.valueInMmol, unit)
+                onConvertValue(entry.valueInMmol, unit)
             }
 
-            val status = remember(convertedValue) {
-                viewModel.getGlucoseStatusByUnit(convertedValue, unit)
+            val status = remember(convertedValue, unit) {
+                onGetStatus(convertedValue, unit)
             }
 
             val dismissState = rememberSwipeToDismissBoxState()
