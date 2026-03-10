@@ -35,9 +35,9 @@ class GlucoseViewModel(
 
     private val _unit = MutableStateFlow(GlucoseUnit.MMOL_L)
     private val _inputValue = MutableStateFlow("")
-    private val _errorMessage = MutableStateFlow<String?>(null)
+    private val _displayErrorMessage = MutableStateFlow(false)
     val inputValue: StateFlow<String> = _inputValue.asStateFlow()
-    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+    val displayErrorMessage: StateFlow<Boolean> = _displayErrorMessage.asStateFlow()
 
     val glucoseEntries: Flow<PagingData<GlucoseEntry>> = Pager(
         config = PagingConfig(pageSize = 20, enablePlaceholders = false)
@@ -77,7 +77,7 @@ class GlucoseViewModel(
 
     fun onInputValueChanged(newValue: String) {
         _inputValue.value = newValue
-        _errorMessage.value = null
+        _displayErrorMessage.value = false
     }
 
     fun saveEntry() {
@@ -88,10 +88,10 @@ class GlucoseViewModel(
             viewModelScope.launch {
                 _glucoseDao.insert(GlucoseEntry(valueInMmol = valueInMmol))
                 _inputValue.value = ""
-                _errorMessage.value = null
+                _displayErrorMessage.value = false
             }
         } else {
-            _errorMessage.value = "Please enter a valid value >= 0"
+            _displayErrorMessage.value = true
         }
     }
 

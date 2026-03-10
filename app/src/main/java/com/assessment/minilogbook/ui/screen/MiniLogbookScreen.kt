@@ -73,7 +73,7 @@ import java.util.Locale
 fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
     val state by viewModel.glucoseState.collectAsStateWithLifecycle()
     val inputValue by viewModel.inputValue.collectAsStateWithLifecycle()
-    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val displayErrorMessage by viewModel.displayErrorMessage.collectAsStateWithLifecycle()
 
     val glucoseEntries = viewModel.glucoseEntries.collectAsLazyPagingItems()
     val unit = state.unit
@@ -161,7 +161,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     InputSection(
                         unit = unit,
                         inputValue = inputValue,
-                        errorMessage = errorMessage,
+                        displayErrorMessage = displayErrorMessage,
                         onUnitSelected = onUnitSelected,
                         onValueChange = onValueChange,
                         onSave = onSave
@@ -192,7 +192,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                 InputSection(
                     unit = unit,
                     inputValue = inputValue,
-                    errorMessage = errorMessage,
+                    displayErrorMessage = displayErrorMessage,
                     onUnitSelected = onUnitSelected,
                     onValueChange = onValueChange,
                     onSave = onSave
@@ -214,7 +214,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
 private fun InputSection(
     unit: GlucoseUnit,
     inputValue: String,
-    errorMessage: String?,
+    displayErrorMessage: Boolean,
     onUnitSelected: (GlucoseUnit) -> Unit,
     onValueChange: (String) -> Unit,
     onSave: () -> Unit
@@ -236,7 +236,7 @@ private fun InputSection(
         onValueChange = onValueChange,
         unitText = unitText,
         onDone = onSave,
-        errorMessage = if (errorMessage != null) stringResource(R.string.error_invalid_value) else null
+        errorMessage = if (displayErrorMessage) stringResource(R.string.error_invalid_value) else null
     )
 
     Button(

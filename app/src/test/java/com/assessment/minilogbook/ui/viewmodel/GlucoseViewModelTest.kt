@@ -16,7 +16,8 @@ import kotlinx.coroutines.test.*
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,7 +81,7 @@ class GlucoseViewModelTest(
     // stateIn with WhileSubscribed requires an active collector to start upstream.
     // We launch a collector inside the test scope to trigger the flow subscription.
     private fun TestScope.collectState() = launch {
-        viewModel.state.collect {}
+        viewModel.glucoseState.collect {}
     }
 
     @Test
@@ -91,7 +92,7 @@ class GlucoseViewModelTest(
         advanceUntilIdle()
 
         assertEquals("5.5", viewModel.inputValue.first())
-        assertNull(viewModel.errorMessage.first())
+        assertFalse(viewModel.displayErrorMessage.first())
 
         job.cancel()
     }
@@ -104,7 +105,7 @@ class GlucoseViewModelTest(
         viewModel.saveEntry()
         advanceUntilIdle()
 
-        assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
+        assertTrue(viewModel.displayErrorMessage.value)
         // null input — toMmolIfValid is called with null, which returns null (default stub)
         verify(converter).toMmolIfValid(org.mockito.kotlin.isNull(), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao, never()).insert(any())
@@ -120,7 +121,7 @@ class GlucoseViewModelTest(
         viewModel.saveEntry()
         advanceUntilIdle()
 
-        assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
+        assertTrue(viewModel.displayErrorMessage.value)
         // "abc".toDoubleOrNull() == null → toMmolIfValid called with null
         verify(converter).toMmolIfValid(org.mockito.kotlin.isNull(), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao, never()).insert(any())
@@ -136,7 +137,7 @@ class GlucoseViewModelTest(
         viewModel.saveEntry()
         advanceUntilIdle()
 
-        assertEquals("Please enter a valid value >= 0", viewModel.errorMessage.first())
+        assertTrue(viewModel.displayErrorMessage.value)
         verify(converter).toMmolIfValid(eq(-1.0), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao, never()).insert(any())
 
@@ -156,7 +157,7 @@ class GlucoseViewModelTest(
         verify(converter).toMmolIfValid(eq(5.0), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao).insert(any())
         assertEquals("", viewModel.inputValue.first())
-        assertNull(viewModel.errorMessage.first())
+        assertFalse(viewModel.displayErrorMessage.value)
 
         job.cancel()
     }
@@ -177,7 +178,7 @@ class GlucoseViewModelTest(
         viewModel.onUnitChanged(GlucoseUnit.MG_DL)
         advanceUntilIdle()
 
-        val state = viewModel.state.first()
+        val state = viewModel.glucoseState.first()
         assertEquals(GlucoseUnit.MG_DL, state.unit)
         verify(converter).convertValue(eq(inputDouble), eq(GlucoseUnit.MMOL_L), eq(GlucoseUnit.MG_DL))
         assertEquals(expectedDouble, viewModel.inputValue.first().toDouble(), 0.0001)
@@ -191,7 +192,7 @@ class GlucoseViewModelTest(
         averageFlow.emit(null)
         advanceUntilIdle()
 
-        val state = viewModel.state.first()
+        val state = viewModel.glucoseState.first()
         assertEquals(0.0, state.average, 0.001)
 
         job.cancel()
@@ -208,7 +209,7 @@ class GlucoseViewModelTest(
         averageFlow.emit(10.0)
         advanceUntilIdle()
 
-        var state = viewModel.state.first()
+        var state = viewModel.glucoseState.first()
         // Default unit is MMOL_L, so average should be 10.0
         assertEquals(10.0, state.average, 0.001)
         verify(converter).fromMmol(eq(10.0), eq(GlucoseUnit.MMOL_L))
@@ -217,7 +218,7 @@ class GlucoseViewModelTest(
         viewModel.onUnitChanged(GlucoseUnit.MG_DL)
         advanceUntilIdle()
 
-        state = viewModel.state.first()
+        state = viewModel.glucoseState.first()
         // 10.0 * 18.0182 = 180.182
         assertEquals(180.182, state.average, 0.001)
         verify(converter).fromMmol(eq(10.0), eq(GlucoseUnit.MG_DL))
@@ -229,7 +230,7 @@ class GlucoseViewModelTest(
     fun `isLoading is initially true and becomes false after average emission`() = runTest {
 
         // Initial state
-        assertEquals(true, viewModel.state.value.isLoading)
+        assertEquals(true, viewModel.glucoseState.value.isLoading)
 
         // Start collecting
         val job = collectState()
@@ -239,7 +240,7 @@ class GlucoseViewModelTest(
         advanceUntilIdle()
 
         // State should now be loaded
-        assertEquals(false, viewModel.state.first().isLoading)
+        assertEquals(false, viewModel.glucoseState.first().isLoading)
 
         job.cancel()
     }
