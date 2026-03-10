@@ -15,8 +15,10 @@ import com.assessment.minilogbook.R
 import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.ui.util.getColorForStatus
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * A composable item that displays a single glucose entry.
@@ -45,8 +47,10 @@ fun EntryItem(
     }
 
     val formattedDate = remember(timestamp) {
-        SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-            .format(Date(timestamp))
+        DateTimeFormatter
+            .ofPattern("MMM dd, yyyy HH:mm", Locale.getDefault())
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.ofEpochMilli(timestamp))
     }
 
     Card(
