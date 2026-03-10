@@ -16,8 +16,8 @@ val appModule = module {
     // Singleton for the DAO
     single { get<GlucoseDatabase>().glucoseDao() }
 
-    // Bind the concrete GlucoseService to the IGlucoseService interface
-    factory { GlucoseService() } bind IGlucoseService::class
+    // Bind the concrete GlucoseService to the IGlucoseService interface as a Singleton
+    single { GlucoseService() } bind IGlucoseService::class
 
     // Define ViewModel using constructor DSL from core module
     viewModelOf(::GlucoseViewModel)

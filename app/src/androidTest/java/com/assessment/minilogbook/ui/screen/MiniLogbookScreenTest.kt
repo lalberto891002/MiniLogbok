@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
-import org.koin.core.module.dsl.factoryOf
+import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
@@ -58,7 +58,7 @@ class MiniLogbookScreenTest {
                 modules(
                     module {
                         single<GlucoseDao> { dao }
-                        factoryOf(::GlucoseService) bind IGlucoseService::class
+                        singleOf(::GlucoseService) bind IGlucoseService::class
                         viewModelOf(::GlucoseViewModel)
                     }
                 )
