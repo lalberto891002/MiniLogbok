@@ -92,6 +92,68 @@ class GlucoseViewModelTest {
     }
 
     @Test
+    fun `onInputValueChanged ignores input exceeding MAX_INPUT_LENGTH`() = runTest {
+        val job = collectState()
+
+        val tooLong = "1".repeat(GlucoseViewModel.MAX_INPUT_LENGTH + 1)
+        viewModel.onInputValueChanged(tooLong)
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.inputValue.first())
+
+        job.cancel()
+    }
+
+    @Test
+    fun `onInputValueChanged ignores input with multiple dots`() = runTest {
+        val job = collectState()
+
+        viewModel.onInputValueChanged("1.2.3")
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.inputValue.first())
+
+        job.cancel()
+    }
+
+    @Test
+    fun `onInputValueChanged ignores input with letters`() = runTest {
+        val job = collectState()
+
+        viewModel.onInputValueChanged("12abc")
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.inputValue.first())
+
+        job.cancel()
+    }
+
+    @Test
+    fun `onInputValueChanged accepts valid decimal string`() = runTest {
+        val job = collectState()
+
+        viewModel.onInputValueChanged("99.99")
+        advanceUntilIdle()
+
+        assertEquals("99.99", viewModel.inputValue.first())
+
+        job.cancel()
+    }
+
+    @Test
+    fun `onInputValueChanged accepts empty string to clear field`() = runTest {
+        val job = collectState()
+
+        viewModel.onInputValueChanged("5.5")
+        viewModel.onInputValueChanged("")
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.inputValue.first())
+
+        job.cancel()
+    }
+
+    @Test
     fun `saveEntry with empty input sets error message`() = runTest {
         val job = collectState()
 
@@ -125,12 +187,14 @@ class GlucoseViewModelTest {
     fun `saveEntry with negative input sets error message`() = runTest {
         val job = collectState()
 
+        // "-1.0" is rejected by the sanitisation regex (no leading minus allowed),
+        // so inputValue stays empty and toMmolIfValid receives null.
         viewModel.onInputValueChanged("-1.0")
         viewModel.saveEntry()
         advanceUntilIdle()
 
         assertTrue(viewModel.displayErrorMessage.value)
-        verify(converter).toMmolIfValid(eq(-1.0), eq(GlucoseUnit.MMOL_L))
+        verify(converter).toMmolIfValid(org.mockito.kotlin.isNull(), eq(GlucoseUnit.MMOL_L))
         verify(glucoseDao, never()).insert(any())
 
         job.cancel()
@@ -179,16 +243,16 @@ class GlucoseViewModelTest {
     }
 
     @Test
-    fun `onUnitChanged with non-numeric input does not call convertValue and keeps original input`() = runTest {
+    fun `onUnitChanged with non-numeric input does not call convertValue and keeps empty input`() = runTest {
         val job = collectState()
-        val nonNumericInput = "abc"
-        viewModel.onInputValueChanged(nonNumericInput)
+        // "abc" is rejected by the sanitisation filter, so inputValue stays empty
+        viewModel.onInputValueChanged("abc")
 
         viewModel.onUnitChanged(GlucoseUnit.MG_DL)
         advanceUntilIdle()
 
         verify(converter, never()).convertValue(any(), any(), any())
-        assertEquals(nonNumericInput, viewModel.inputValue.first())
+        assertEquals("", viewModel.inputValue.first())
 
         job.cancel()
     }

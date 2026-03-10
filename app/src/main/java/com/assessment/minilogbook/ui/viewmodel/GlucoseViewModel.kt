@@ -33,6 +33,21 @@ class GlucoseViewModel(
     private val _glucoseService: IGlucoseService
 ) : ViewModel() {
 
+    companion object {
+        /**
+         * Maximum number of characters allowed in the glucose input field.
+         * Covers both mmol/L (e.g. "33.3333") and mg/dL (e.g. "999.999") within 7 chars.
+         */
+        const val MAX_INPUT_LENGTH = 7
+
+        /**
+         * Regex that accepts an optional sequence of digits, followed by an optional single dot
+         * and another optional sequence of digits. Empty string is also allowed (field cleared).
+         * This prevents multiple dots ("1.2.3"), letters, or other non-numeric characters.
+         */
+        private val VALID_DECIMAL_REGEX = Regex("""^\d*\.?\d*$""")
+    }
+
     private val _unit = MutableStateFlow(GlucoseUnit.MMOL_L)
     private val _inputValue = MutableStateFlow("")
     private val _displayErrorMessage = MutableStateFlow(false)
@@ -76,6 +91,8 @@ class GlucoseViewModel(
     }
 
     fun onInputValueChanged(newValue: String) {
+        if (newValue.length > MAX_INPUT_LENGTH) return
+        if (!VALID_DECIMAL_REGEX.matches(newValue)) return
         _inputValue.value = newValue
         _displayErrorMessage.value = false
     }
