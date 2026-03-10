@@ -1,17 +1,17 @@
 package com.assessment.minilogbook.domain.service
 
-import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
-import org.junit.Assert.*
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 class GlucoseServiceTest {
 
     private lateinit var converter: GlucoseService
     private val epsilon = 0.0001 // to compare floating point numbers we can use a smaller epsilon value if more precision is needed
 
-    @Before
+    @BeforeEach
     fun setUp() {
         converter = GlucoseService()
     }

@@ -9,7 +9,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.assessment.minilogbook.data.GlucoseDao
 import com.assessment.minilogbook.data.GlucoseEntry
-import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.domain.service.IGlucoseService
 import kotlinx.coroutines.flow.Flow

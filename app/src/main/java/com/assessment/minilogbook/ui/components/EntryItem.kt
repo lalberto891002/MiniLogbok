@@ -12,7 +12,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.assessment.minilogbook.R
-import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import java.text.SimpleDateFormat

@@ -23,31 +23,41 @@ The project follows a layered architecture with a clear separation of concerns:
 
 ```
 app/
-├── data/           — Room entities, DAO, database, encryption
-├── domain/         — Business logic (conversion, validation, status)
-│   ├── model/      — BloodGlucoseStatus enum
-│   └── service/    — GlucoseService
-├── di/             — Koin dependency injection module
+├── data/
+│   ├── GlucoseEntry.kt      — Room entity
+│   ├── GlucoseDao.kt        — DAO interface
+│   ├── GlucoseDatabase.kt   — Encrypted Room database singleton
+│   └── PassphraseManager.kt — Android Keystore passphrase management
+├── domain/                  — Business logic (conversion, validation, status)
+│   ├── model/               — BloodGlucoseStatus enum, GlucoseUnit enum
+│   └── service/             — IGlucoseService + GlucoseService
+├── di/                      — Koin dependency injection module
 └── ui/
-    ├── components/ — Reusable Composables
-    ├── screen/     — MiniLogbookScreen + section composables
-    ├── theme/      — Material3 theme, colours, typography
-    ├── util/       — Status → colour mapper
-    └── viewmodel/  — GlucoseViewModel + GlucoseState
+    ├── components/          — Reusable Composables
+    ├── screen/              — MiniLogbookScreen + section composables
+    ├── theme/               — Material3 theme, colours, typography
+    ├── util/                — Status → colour mapper
+    └── viewmodel/           — GlucoseViewModel + GlucoseState
 ```
 
 ### Data layer
 
-| Class | Responsibility |
+Each type lives in its own file under `data/`:
+
+| File | Responsibility |
 |---|---|
-| `GlucoseEntry` | Room entity — stores `valueInMmol` as the canonical unit, plus `timestamp` |
-| `GlucoseDao` | `insert`, `delete`, `deleteAll`, `getAllEntries` (Flow, ordered DESC by timestamp) |
-| `GlucoseDatabase` | Room database with SQLCipher encryption via `SupportOpenHelperFactory` |
-| `PassphraseManager` | Generates and persists the DB passphrase in `EncryptedSharedPreferences` |
+| `GlucoseEntry.kt` | Room entity — stores `valueInMmol` as the canonical unit, plus `timestamp` |
+| `GlucoseDao.kt` | `insert`, `delete`, `deleteAll`, `getAllEntries` (PagingSource), `getAverageValue` (Flow) |
+| `GlucoseDatabase.kt` | Room database singleton with SQLCipher encryption via `SupportOpenHelperFactory` |
+| `PassphraseManager.kt` | Generates, encrypts and persists the DB passphrase via Android Keystore |
 
 **All values are stored in mmol/L.** Conversion to mg/dL happens at the UI layer only.
 
 ### Domain layer
+
+`domain/model/` contains two enums:
+- `GlucoseUnit` — the two supported measurement units (`MMOL_L`, `MG_DL`)
+- `BloodGlucoseStatus` — classification of a reading (`IN_TARGET`, `OK`, `OUT_OF_RANGE`)
 
 `GlucoseService` encapsulates all conversion and validation logic:
 - `validateValue(Double?)` — rejects null and negative values

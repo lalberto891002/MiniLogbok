@@ -57,7 +57,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.data.GlucoseEntry
-import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.ui.components.EntryItem
 import com.assessment.minilogbook.ui.components.GlucoseInputField
 import com.assessment.minilogbook.ui.components.GlucoseUnitSelector

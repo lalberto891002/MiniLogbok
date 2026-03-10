@@ -1,6 +1,6 @@
 package com.assessment.minilogbook.domain.service
 
-import com.assessment.minilogbook.data.GlucoseUnit
+import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import java.util.Locale
 
