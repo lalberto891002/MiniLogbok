@@ -16,8 +16,12 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
  *
  * Only one entity is currently registered: [GlucoseEntry]. Bump [version] and supply a
  * [androidx.room.migration.Migration] whenever the schema changes.
+ *
+ * Schema JSON files are exported to `app/schemas/` (configured via `room.schemaLocation` in
+ * `build.gradle.kts`). Commit those files to version control so that
+ * [androidx.room.testing.MigrationTestHelper] can load them when writing migration tests.
  */
-@Database(entities = [GlucoseEntry::class], version = 1, exportSchema = false)
+@Database(entities = [GlucoseEntry::class], version = 1, exportSchema = true)
 abstract class GlucoseDatabase : RoomDatabase() {
 
     /** Returns the DAO used to read and write [GlucoseEntry] records. */
@@ -50,6 +54,8 @@ abstract class GlucoseDatabase : RoomDatabase() {
                     "glucose_database"
                 )
                     .openHelperFactory(factory)
+                    .addMigrations(*Migrations.all)
+                    .fallbackToDestructiveMigrationOnDowngrade(true)
                     .build()
 
                 INSTANCE = instance

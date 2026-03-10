@@ -41,6 +41,16 @@ android {
     buildFeatures {
         compose = true
     }
+    sourceSets {
+        // Expose the Room schema JSON files to instrumented tests so that
+        // MigrationTestHelper can load them when validating migrations.
+        sourceSets["androidTest"].assets.srcDirs("$projectDir/schemas")
+    }
+}
+
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
