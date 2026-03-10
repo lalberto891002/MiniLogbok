@@ -29,8 +29,8 @@ data class GlucoseState(
 )
 
 class GlucoseViewModel(
-    private val glucoseDao: GlucoseDao,
-    private val converter: IGlucoseService
+    private val _glucoseDao: GlucoseDao,
+    private val _glucoseService: IGlucoseService
 ) : ViewModel() {
 
     private val _unit = MutableStateFlow(GlucoseUnit.MMOL_L)
@@ -39,22 +39,22 @@ class GlucoseViewModel(
     val inputValue: StateFlow<String> = _inputValue.asStateFlow()
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    val pagingDataFlow: Flow<PagingData<GlucoseEntry>> = Pager(
+    val glucoseEntries: Flow<PagingData<GlucoseEntry>> = Pager(
         config = PagingConfig(pageSize = 20, enablePlaceholders = false)
     ) {
-        glucoseDao.getAllEntries()
+        _glucoseDao.getAllEntries()
     }
         .flow
         .cachedIn(viewModelScope)
 
-    val state: StateFlow<GlucoseState> = combine(
-        glucoseDao.getAverageValue(),
+    val glucoseState: StateFlow<GlucoseState> = combine(
+        _glucoseDao.getAverageValue(),
         _unit
     ) { avgMmol, unit ->
         val safeAvgMmol = avgMmol ?: 0.0
         GlucoseState(
             unit = unit,
-            average = converter.fromMmol(safeAvgMmol, unit),
+            average = _glucoseService.fromMmol(safeAvgMmol, unit),
             isLoading = false
         )
     }.stateIn(
@@ -68,7 +68,7 @@ class GlucoseViewModel(
         val convertedInput = if (currentInput.isNotEmpty()) {
             val value = currentInput.toDoubleOrNull() ?: 0.0
             val fromUnit = if (newUnit == GlucoseUnit.MG_DL) GlucoseUnit.MMOL_L else GlucoseUnit.MG_DL
-            converter.convertValue(value, fromUnit, newUnit).toString()
+            _glucoseService.convertValue(value, fromUnit, newUnit).toString()
         } else ""
 
         _unit.value = newUnit
@@ -82,11 +82,11 @@ class GlucoseViewModel(
 
     fun saveEntry() {
         val rawValue = _inputValue.value.toDoubleOrNull()
-        val valueInMmol = converter.toMmolIfValid(rawValue, _unit.value)
+        val valueInMmol = _glucoseService.toMmolIfValid(rawValue, _unit.value)
 
         if (valueInMmol != null) {
             viewModelScope.launch {
-                glucoseDao.insert(GlucoseEntry(valueInMmol = valueInMmol))
+                _glucoseDao.insert(GlucoseEntry(valueInMmol = valueInMmol))
                 _inputValue.value = ""
                 _errorMessage.value = null
             }
@@ -96,21 +96,21 @@ class GlucoseViewModel(
     }
 
     fun convertValue(valueInMmol: Double, toUnit: GlucoseUnit): Double {
-        return converter.fromMmol(valueInMmol, toUnit)
+        return _glucoseService.fromMmol(valueInMmol, toUnit)
     }
 
     fun deleteEntry(entry: GlucoseEntry) {
         viewModelScope.launch {
-            glucoseDao.delete(entry)
+            _glucoseDao.delete(entry)
         }
     }
 
     fun getGlucoseStatus(valueInMmol: Double): BloodGlucoseStatus {
-        return converter.getGlucoseStatus(valueInMmol)
+        return _glucoseService.getGlucoseStatus(valueInMmol)
     }
 
     fun getGlucoseStatusByUnit(value: Double, unit: GlucoseUnit): BloodGlucoseStatus {
-        return converter.getGlucoseStatusByUnit(value, unit)
+        return _glucoseService.getGlucoseStatusByUnit(value, unit)
     }
 
 }

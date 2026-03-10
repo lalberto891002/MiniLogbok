@@ -71,11 +71,11 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by viewModel.glucoseState.collectAsStateWithLifecycle()
     val inputValue by viewModel.inputValue.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
-    val pagedEntries = viewModel.pagingDataFlow.collectAsLazyPagingItems()
+    val glucoseEntries = viewModel.glucoseEntries.collectAsLazyPagingItems()
     val unit = state.unit
     val average = state.average
     val isLoading = state.isLoading
@@ -173,7 +173,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                     verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_medium))
                 ) {
                     HistorySection(
-                        pagedEntries = pagedEntries,
+                        pagedEntries = glucoseEntries,
                         unit = unit,
                         viewModel = viewModel,
                         onDeleteRequest = onDeleteRequest
@@ -199,7 +199,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                 )
                 SummarySection(average, unit, viewModel)
                 HistorySection(
-                    pagedEntries = pagedEntries,
+                    pagedEntries = glucoseEntries,
                     unit = unit,
                     viewModel = viewModel,
                     onDeleteRequest = onDeleteRequest
