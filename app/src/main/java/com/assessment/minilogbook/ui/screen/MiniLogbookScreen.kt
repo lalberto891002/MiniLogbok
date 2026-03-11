@@ -73,14 +73,14 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
-    val state by viewModel.glucoseState.collectAsStateWithLifecycle()
+    val glucoseState by viewModel.glucoseState.collectAsStateWithLifecycle()
     val inputValue by viewModel.inputValue.collectAsStateWithLifecycle()
     val displayErrorMessage by viewModel.displayErrorMessage.collectAsStateWithLifecycle()
 
     val glucoseEntries = viewModel.glucoseEntries.collectAsLazyPagingItems()
-    val unit = state.unit
-    val average = state.average
-    val isLoading = state.isLoading
+    val unit = glucoseState.unit
+    val average = glucoseState.average
+    val isLoading = glucoseState.isLoading
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val windowInfo = LocalWindowInfo.current
