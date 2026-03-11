@@ -27,6 +27,7 @@ app/
 │   ├── GlucoseEntry.kt      — Room entity
 │   ├── GlucoseDao.kt        — DAO interface
 │   ├── GlucoseDatabase.kt   — Encrypted Room database singleton
+│   ├── Migrations.kt        — Central registry for Room schema migrations
 │   └── PassphraseManager.kt — Android Keystore passphrase management
 ├── domain/                  — Business logic (conversion, validation, status)
 │   ├── model/               — BloodGlucoseStatus enum, GlucoseUnit enum
@@ -60,7 +61,8 @@ Each type lives in its own file under `data/`:
 - `BloodGlucoseStatus` — classification of a reading (`IN_TARGET`, `OK`, `OUT_OF_RANGE`)
 
 `GlucoseService` encapsulates all conversion and validation logic:
-- `validateValue(Double?)` — rejects null and negative values
+- `validateValue(Double?)` — rejects null and negative values; **0.0 is accepted as valid**
+- `toMmol(Double, GlucoseUnit)` — converts a value from any unit to mmol/L
 - `toMmolIfValid(Double?, GlucoseUnit)` — validates and converts to mmol/L
 - `convertValue(Double, GlucoseUnit, GlucoseUnit)` — bidirectional conversion
 - `fromMmol(Double, GlucoseUnit)` — converts stored mmol to display unit
@@ -133,7 +135,8 @@ Room ──► SQLCipher (AES-256) ──► encrypted .db file
               │
          passphrase (32 random bytes)
               │
-    EncryptedSharedPreferences (AES-256-GCM)
+    SharedPreferences (ciphertext + IV stored as Base64 strings)
+    encrypted by Cipher (AES/GCM/NoPadding) directly via Android Keystore
               │
     Android Keystore
          ├── API 28+ with StrongBox → dedicated security chip (Titan M / SE)
@@ -149,7 +152,7 @@ Koin is used for DI via `AppModule`:
 ```
 GlucoseDatabase (singleton)
     └── GlucoseDao (singleton)
-GlucoseService (factory)
+GlucoseService (singleton)
 GlucoseViewModel (viewModel)
 ```
 
@@ -177,6 +180,16 @@ Run against an **in-memory SQLCipher database**:
 | `deleteSingleEntry_listBecomesEmptyWhenOnlyOneEntry` | Deleting the only entry results in empty list |
 | `deleteEntry_doesNotAffectOtherEntries` | Deleting middle entry preserves order of remaining |
 | `deleteNonExistentEntry_doesNothing` | Deleting an entry with an unknown id is a no-op |
+
+### Instrumented PassphraseManager tests (`src/androidTest`) — `PassphraseManagerTest`
+
+Uses isolated SharedPreferences and a dedicated Keystore alias so tests never touch the production key:
+
+| Test | What it verifies |
+|---|---|
+| `getOrCreatePassphrase_returnsConsistency` | Generated passphrase is 32 bytes and identical on subsequent calls |
+| `getOrCreatePassphrase_differentPrefs_differentPassphrases` | Two independent prefs names produce independent passphrases |
+| `getOrCreatePassphrase_concurrentAccess_returnsSamePassphrase` | Concurrent threads both obtain the same passphrase (no duplicate generation) |
 
 ### Instrumented UI tests (`src/androidTest`) — `MiniLogbookScreenTest`
 
@@ -211,7 +224,7 @@ Uses a custom `MiniLogbookTestRunner` + `TestApplication` to prevent the real Ko
 | Pagination | Paging 3 (3.3.6) |
 | Encryption | SQLCipher 4.13.0 + Android Keystore (AES-256-GCM via `KeyGenerator` / `Cipher` directly) |
 | DI | Koin 4.1.1 |
-| Unit tests | JUnit 4 + Mockito + kotlinx-coroutines-test |
+| Unit tests | JUnit 5 (Jupiter) + Mockito + kotlinx-coroutines-test |
 | UI tests | Compose UI Test + AndroidJUnit4 |
 | Build | Gradle KTS + KSP |
 
