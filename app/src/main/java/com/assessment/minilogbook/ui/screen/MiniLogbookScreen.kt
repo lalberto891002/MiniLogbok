@@ -306,7 +306,8 @@ private fun HistorySection(
     val itemCount = pagedEntries.itemCount
 
     LaunchedEffect(itemCount) {
-        if (itemCount > previousCount && listState.firstVisibleItemIndex > 0) {
+        // Only auto-scroll when exactly one new item was inserted (not during bulk initial page loads).
+        if (itemCount == previousCount + 1 && listState.firstVisibleItemIndex > 0) {
             listState.animateScrollToItem(0)
         }
         previousCount = itemCount
@@ -320,7 +321,7 @@ private fun HistorySection(
     ) {
         items(
             count = pagedEntries.itemCount,
-            key = { index -> pagedEntries[index]?.id ?: index }
+            key = { index -> pagedEntries.peek(index)?.id ?: index }
         ) { index ->
             val entry = pagedEntries[index] ?: return@items
 
@@ -354,7 +355,7 @@ private fun HistorySection(
                 backgroundContent = {
                     val errorColor = MaterialTheme.colorScheme.errorContainer
                     val surfaceColor = MaterialTheme.colorScheme.surface
-                    val animatable = remember { Animatable(surfaceColor) }
+                    val animatable = remember(surfaceColor) { Animatable(surfaceColor) }
 
                     LaunchedEffect(isDismissed) {
                         animatable.animateTo(if (isDismissed) errorColor else surfaceColor)

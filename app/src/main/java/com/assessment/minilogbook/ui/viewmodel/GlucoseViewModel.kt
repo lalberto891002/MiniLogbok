@@ -55,7 +55,11 @@ class GlucoseViewModel(
     val displayErrorMessage: StateFlow<Boolean> = _displayErrorMessage.asStateFlow()
 
     val glucoseEntries: Flow<PagingData<GlucoseEntry>> = Pager(
-        config = PagingConfig(pageSize = 20, enablePlaceholders = false)
+        config = PagingConfig(
+            pageSize = 20,
+            prefetchDistance = 20,
+            enablePlaceholders = false
+        )
     ) {
         _glucoseDao.getAllEntries()
     }
