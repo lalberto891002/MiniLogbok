@@ -10,4 +10,13 @@
     <string name="error_invalid_value">Please enter a valid value >= 0</string>
     <string name="action_delete">Entry removed</string>
     <string name="action_undo">Undo</string>
+    <!-- Detail screen -->
+    <string name="title_entry_detail">Entry Detail</string>
+    <string name="label_glucose_value">Glucose Value</string>
+    <string name="label_date_time">Date &amp; Time</string>
+    <string name="label_status">Status</string>
+    <string name="status_in_target">In Target ✓</string>
+    <string name="status_ok">Acceptable</string>
+    <string name="status_out_of_range">Out of Range !</string>
+    <string name="navigate_back">Back</string>
 </resources>

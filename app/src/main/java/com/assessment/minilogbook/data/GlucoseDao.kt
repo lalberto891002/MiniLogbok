@@ -52,4 +52,10 @@ interface GlucoseDao {
      */
     @Query("DELETE FROM glucose_entries")
     suspend fun deleteAll()
+
+    /**
+     * Observes a single [GlucoseEntry] by [id]. Emits null if not found.
+     */
+    @Query("SELECT * FROM glucose_entries WHERE id = :id LIMIT 1")
+    fun getEntryById(id: Int): Flow<GlucoseEntry?>
 }
