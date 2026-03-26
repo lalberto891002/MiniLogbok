@@ -12,6 +12,7 @@ A minimal blood glucose logbook Android app for patients, built with **Jetpack C
 - Colour-coded entries: 🟢 in target / 🟠 ok / 🔴 out of range
 - Delete entries via **swipe-to-dismiss** or the **trash icon** inside each card
 - Undo deletion via a **Snackbar** before the action is committed to the database
+- **Detail screen** — tap any entry to open a full-detail view showing both mmol/L and mg/dL values, date/time, and colour-coded status
 - Responsive layout — two-column on tablets/landscape, single-column on phones
 - **Encrypted database** — patient data is encrypted at rest using SQLCipher + Android Keystore
 
@@ -35,10 +36,11 @@ app/
 ├── di/                      — Koin dependency injection module
 └── ui/
     ├── components/          — Reusable Composables
-    ├── screen/              — MiniLogbookScreen + section composables
+    ├── navigation/          — AppNavGraph (NavHost) + AppRoutes (sealed class)
+    ├── screen/              — MiniLogbookScreen, GlucoseDetailScreen + section composables
     ├── theme/               — Material3 theme, colours, typography
     ├── util/                — Status → colour mapper
-    └── viewmodel/           — GlucoseViewModel + GlucoseState
+    └── viewmodel/           — GlucoseViewModel + GlucoseState + GlucoseDetailViewModel
 ```
 
 ### Data layer
@@ -87,6 +89,46 @@ Each type lives in its own file under `data/`:
 
 **Key design decision:** `inputValue` and `displayErrorMessage` are kept outside the `combine()` operator so that typing in the input field never triggers a Room query emission or recomposes the entries list. Each `StateFlow` is collected independently in the screen.
 
+#### GlucoseDetailViewModel
+
+`GlucoseDetailViewModel` is scoped to the `GlucoseDetail` destination and obtains the entry id from its `SavedStateHandle` (populated automatically by Navigation Compose). It exposes:
+- `entry: StateFlow<GlucoseEntry?>` — single-entry flow from `GlucoseDao.getEntryById(entryId)`, emits `null` while loading or if the entry is not found
+- `convertValue(valueInMmol, toUnit)` — delegates to `IGlucoseService.fromMmol`
+- `getStatus(valueInMmol)` — delegates to `IGlucoseService.getGlucoseStatus`
+
+### Navigation layer
+
+Navigation is implemented with **Navigation Compose** using a type-safe sealed class `AppRoutes` and a single `AppNavGraph` composable.
+
+#### AppRoutes
+
+```kotlin
+sealed class AppRoutes(val route: String) {
+    data object LogbookList : AppRoutes("logbook_list")
+    data object GlucoseDetail : AppRoutes("glucose_detail/{entryId}") {
+        const val ARG_ENTRY_ID = "entryId"
+        fun createRoute(entryId: Int) = "glucose_detail/$entryId"
+    }
+}
+```
+
+#### AppNavGraph
+
+`AppNavGraph` creates a `NavController` with `rememberNavController()` and defines two destinations inside a `NavHost`:
+
+| Destination | Route | Screen | Notes |
+|---|---|---|---|
+| `LogbookList` | `logbook_list` | `MiniLogbookScreen` | Start destination; passes `onEntryClick` lambda that navigates to detail |
+| `GlucoseDetail` | `glucose_detail/{entryId}` | `GlucoseDetailScreen` | `entryId` declared as `NavType.IntType`; Koin injects `GlucoseDetailViewModel` with the correct `SavedStateHandle` automatically |
+
+```
+LogbookList ──(tap entry)──► GlucoseDetail
+                                   │
+                            (back button)
+                                   │
+                             LogbookList
+```
+
 ### UI layer
 
 `MiniLogbookScreen` is split into three private composables to minimise recomposition scope:
@@ -96,6 +138,19 @@ Each type lives in its own file under `data/`:
 - **`HistorySection`** — receives `onConvertValue` and `onGetStatus` lambdas instead of the ViewModel; `LazyColumn` with `SwipeToDismissBox` per item; auto-scrolls to the top when a new entry is added
 
 All three private composables follow **state hoisting**: they receive only the data and lambdas they need, making them independently testable and previewable without a real ViewModel.
+
+#### GlucoseDetailScreen
+
+`GlucoseDetailScreen` is a full-screen read-only view for a single glucose entry. It collects `GlucoseDetailViewModel.entry` and renders four `GlucoseDetailCard` composables:
+
+| Card | Content | Icon |
+|---|---|---|
+| Primary glucose value | Value in **mmol/L** (2 decimal places), colour-coded by status | Star |
+| Secondary glucose value | Value in **mg/dL** (1 decimal place), colour-coded by status | Star |
+| Date & time | Full weekday + date + time (`EEEE, MMM dd yyyy  •  HH:mm`) | DateRange |
+| Status | `In target` / `Ok` / `Out of range`, colour-coded | Info |
+
+While the entry is loading (`entry == null`) a centred `CircularProgressIndicator` is shown. All derived values (`mgdlValue`, `status`, `formattedMmol`, `formattedMgdl`, `formattedDate`) are wrapped in `remember(key)` to avoid redundant recalculations on recomposition. The screen's `TopAppBar` provides a back-navigation arrow that calls `onNavigateBack`.
 
 ---
 
@@ -154,6 +209,7 @@ GlucoseDatabase (singleton)
     └── GlucoseDao (singleton)
 GlucoseService (singleton)
 GlucoseViewModel (viewModel)
+GlucoseDetailViewModel (viewModel) — SavedStateHandle injected automatically by Koin + Navigation Compose
 ```
 
 ---
@@ -219,6 +275,7 @@ Uses a custom `MiniLogbookTestRunner` + `TestApplication` to prevent the real Ko
 | Component | Library |
 |---|---|
 | UI | Jetpack Compose + Material 3 |
+| Navigation | Navigation Compose |
 | State | `StateFlow` + `collectAsStateWithLifecycle` |
 | Database | Room 2.8.4 |
 | Pagination | Paging 3 (3.3.6) |
