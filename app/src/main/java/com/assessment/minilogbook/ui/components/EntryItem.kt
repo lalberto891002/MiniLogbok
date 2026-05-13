@@ -37,7 +37,8 @@ fun EntryItem(
     status: BloodGlucoseStatus,
     timestamp: Long,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = { } // Optional click handler for the entire card, e.g. to navigate to detail screen
 ) {
     val statusColor = getColorForStatus(status)
 
@@ -54,6 +55,7 @@ fun EntryItem(
     }
 
     Card(
+        onClick = onClick,
         modifier = modifier.testTag("entry_$formattedValue"),
         elevation = CardDefaults.cardElevation(defaultElevation = dimensionResource(R.dimen.card_elevation)),
         colors = CardDefaults.cardColors(

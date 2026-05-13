@@ -89,6 +89,9 @@ dependencies {
     testImplementation(libs.androidx.paging.testing)
     androidTestImplementation(libs.androidx.paging.testing)
 
+    // Navigation Compose
+    implementation(libs.androidx.navigation.compose)
+
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)

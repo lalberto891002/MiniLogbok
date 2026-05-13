@@ -3,6 +3,7 @@ package com.assessment.minilogbook.di
 import com.assessment.minilogbook.data.GlucoseDatabase
 import com.assessment.minilogbook.domain.service.GlucoseService
 import com.assessment.minilogbook.domain.service.IGlucoseService
+import com.assessment.minilogbook.ui.viewmodel.GlucoseDetailViewModel
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModelOf
@@ -21,4 +22,7 @@ val appModule = module {
 
     // Define ViewModel using constructor DSL from core module
     viewModelOf(::GlucoseViewModel)
+
+    // Detail screen ViewModel — receives SavedStateHandle automatically via Koin
+    viewModelOf(::GlucoseDetailViewModel)
 }

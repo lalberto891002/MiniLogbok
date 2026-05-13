@@ -72,7 +72,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
+fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
     val glucoseState by viewModel.glucoseState.collectAsStateWithLifecycle()
     val inputValue by viewModel.inputValue.collectAsStateWithLifecycle()
     val displayErrorMessage by viewModel.displayErrorMessage.collectAsStateWithLifecycle()
@@ -197,7 +197,8 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                             unit = unit,
                             onConvertValue = onConvertValue,
                             onGetStatus = onGetStatus,
-                            onDeleteRequest = onDeleteRequest
+                            onDeleteRequest = onDeleteRequest,
+                            onEntryClick = onEntryClick
                         )
                     }
                 }
@@ -226,7 +227,8 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel) {
                         unit = unit,
                         onConvertValue = onConvertValue,
                         onGetStatus = onGetStatus,
-                        onDeleteRequest = onDeleteRequest
+                        onDeleteRequest = onDeleteRequest,
+                        onEntryClick = onEntryClick
                     )
                 }
             }
@@ -293,6 +295,7 @@ private fun HistorySection(
     onConvertValue: (Double, GlucoseUnit) -> Double,
     onGetStatus: (Double, GlucoseUnit) -> BloodGlucoseStatus,
     onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit,
+    onEntryClick : (Int) -> Unit,
     listState: LazyListState = rememberLazyListState()
 ) {
     Text(
@@ -375,6 +378,7 @@ private fun HistorySection(
                     unit = unit,
                     status = status,
                     timestamp = entry.timestamp,
+                    onClick = { onEntryClick(entry.id) },
                     onDelete = {
                         coroutineScope.launch {
                             dismissState.dismiss(SwipeToDismissBoxValue.EndToStart)
