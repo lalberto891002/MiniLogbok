@@ -244,4 +244,59 @@ class GlucoseDaoTest(
         ) as PagingSource.LoadResult.Page).data
         assertEquals(1, remaining.size)
     }
+
+    @Test
+    @Throws(Exception::class)
+    fun deleteById_removesCorrectEntry() = runBlocking {
+        glucoseDao.insert(GlucoseEntry(valueInMmol = 4.0, timestamp = 1000L))
+        glucoseDao.insert(GlucoseEntry(valueInMmol = 8.0, timestamp = 2000L))
+
+        val inserted = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(key = null, loadSize = 10, placeholdersEnabled = false)
+        ) as PagingSource.LoadResult.Page).data
+        val idToDelete = inserted.first { it.valueInMmol == 4.0 }.id
+
+        glucoseDao.deleteById(idToDelete)
+
+        val remaining = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(key = null, loadSize = 10, placeholdersEnabled = false)
+        ) as PagingSource.LoadResult.Page).data
+        assertEquals(1, remaining.size)
+        assertEquals(8.0, remaining[0].valueInMmol, 0.0)
+    }
+
+    @Test
+    @Throws(Exception::class)
+    fun deleteById_nonExistentId_doesNothing() = runBlocking {
+        glucoseDao.insert(GlucoseEntry(valueInMmol = 5.0, timestamp = 1000L))
+
+        glucoseDao.deleteById(999)
+
+        val remaining = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(key = null, loadSize = 10, placeholdersEnabled = false)
+        ) as PagingSource.LoadResult.Page).data
+        assertEquals(1, remaining.size)
+    }
+
+    @Test
+    @Throws(Exception::class)
+    fun deleteById_doesNotAffectOtherEntries() = runBlocking {
+        listOf(1000L, 2000L, 3000L).forEach {
+            glucoseDao.insert(GlucoseEntry(valueInMmol = it.toDouble(), timestamp = it))
+        }
+
+        val inserted = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(key = null, loadSize = 10, placeholdersEnabled = false)
+        ) as PagingSource.LoadResult.Page).data
+        val idToDelete = inserted.first { it.timestamp == 2000L }.id
+
+        glucoseDao.deleteById(idToDelete)
+
+        val remaining = (glucoseDao.getAllEntries().load(
+            PagingSource.LoadParams.Refresh(key = null, loadSize = 10, placeholdersEnabled = false)
+        ) as PagingSource.LoadResult.Page).data
+        assertEquals(2, remaining.size)
+        assertEquals(3000.0, remaining[0].valueInMmol, 0.0)
+        assertEquals(1000.0, remaining[1].valueInMmol, 0.0)
+    }
 }

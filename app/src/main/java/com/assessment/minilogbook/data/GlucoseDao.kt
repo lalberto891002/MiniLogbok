@@ -48,6 +48,15 @@ interface GlucoseDao {
     suspend fun delete(entry: GlucoseEntry)
 
     /**
+     * Deletes a specific entry by its primary key.
+     * Preferred over [delete] when only the id is available (e.g. from a UI model).
+     *
+     * @param id The primary key of the entry to remove.
+     */
+    @Query("DELETE FROM glucose_entries WHERE id = :id")
+    suspend fun deleteById(id: Int)
+
+    /**
      * Removes all entries from the table.
      */
     @Query("DELETE FROM glucose_entries")

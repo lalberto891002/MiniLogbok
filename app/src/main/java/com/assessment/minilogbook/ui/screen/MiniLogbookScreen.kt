@@ -57,14 +57,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.assessment.minilogbook.R
-import com.assessment.minilogbook.data.GlucoseEntry
+import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.ui.components.EntryItem
 import com.assessment.minilogbook.ui.components.GlucoseInputField
 import com.assessment.minilogbook.ui.components.GlucoseUnitSelector
 import com.assessment.minilogbook.ui.components.StatusValueCard
-import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
 import com.assessment.minilogbook.ui.util.getColorForStatus
+import com.assessment.minilogbook.ui.viewmodel.GlucoseListEntryUi
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
@@ -98,7 +98,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
         keyboardController?.hide()
     }
 
-    val onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit =
+    val onDeleteRequest: (Pair<GlucoseListEntryUi, suspend () -> Unit>) -> Unit =
         remember {
             { (entry, resetDismiss) ->
                 coroutineScope.launch {
@@ -116,13 +116,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
             }
         }
 
-    val onConvertValue: (Double, GlucoseUnit) -> Double =
-        remember { { valueInMmol, toUnit -> viewModel.convertValue(valueInMmol, toUnit) } }
-
-    val onGetStatus: (Double, GlucoseUnit) -> BloodGlucoseStatus =
-        remember { { value, unit -> viewModel.getGlucoseStatusByUnit(value, unit) } }
-
-    val summaryStatus = remember(average, unit) { viewModel.getGlucoseStatusByUnit(average, unit) }
+    val summaryStatus = glucoseState.status
 
     val isExpanded = with(density) {
         windowInfo.containerSize.width.toDp() > 600.dp
@@ -194,9 +188,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
                     key(rotationKey) {
                         HistorySection(
                             pagedEntries = glucoseEntries,
-                            unit = unit,
-                            onConvertValue = onConvertValue,
-                            onGetStatus = onGetStatus,
                             onDeleteRequest = onDeleteRequest,
                             onEntryClick = onEntryClick
                         )
@@ -224,9 +215,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
                 key(rotationKey) {
                     HistorySection(
                         pagedEntries = glucoseEntries,
-                        unit = unit,
-                        onConvertValue = onConvertValue,
-                        onGetStatus = onGetStatus,
                         onDeleteRequest = onDeleteRequest,
                         onEntryClick = onEntryClick
                     )
@@ -290,12 +278,9 @@ private fun SummarySection(average: Double, unit: GlucoseUnit, status: BloodGluc
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HistorySection(
-    pagedEntries: LazyPagingItems<GlucoseEntry>,
-    unit: GlucoseUnit,
-    onConvertValue: (Double, GlucoseUnit) -> Double,
-    onGetStatus: (Double, GlucoseUnit) -> BloodGlucoseStatus,
-    onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit,
-    onEntryClick : (Int) -> Unit,
+    pagedEntries: LazyPagingItems<GlucoseListEntryUi>,
+    onDeleteRequest: (Pair<GlucoseListEntryUi, suspend () -> Unit>) -> Unit,
+    onEntryClick: (Int) -> Unit,
     listState: LazyListState = rememberLazyListState()
 ) {
     Text(
@@ -327,14 +312,6 @@ private fun HistorySection(
             key = { index -> pagedEntries.peek(index)?.id ?: index }
         ) { index ->
             val entry = pagedEntries[index] ?: return@items
-
-            val convertedValue = remember(entry.valueInMmol, unit) {
-                onConvertValue(entry.valueInMmol, unit)
-            }
-
-            val status = remember(convertedValue, unit) {
-                onGetStatus(convertedValue, unit)
-            }
 
             val dismissState = rememberSwipeToDismissBoxState()
             val isDismissed by remember {
@@ -374,9 +351,9 @@ private fun HistorySection(
             ) {
                 EntryItem(
                     modifier = Modifier.fillMaxWidth(),
-                    value = convertedValue,
-                    unit = unit,
-                    status = status,
+                    value = entry.convertedValue,
+                    unit = entry.unit,
+                    status = entry.status,
                     timestamp = entry.timestamp,
                     onClick = { onEntryClick(entry.id) },
                     onDelete = {

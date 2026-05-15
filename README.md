@@ -40,7 +40,7 @@ app/
     ├── screen/              — MiniLogbookScreen, GlucoseDetailScreen + section composables
     ├── theme/               — Material3 theme, colours, typography
     ├── util/                — Status → colour mapper
-    └── viewmodel/           — GlucoseViewModel + GlucoseState + GlucoseDetailViewModel + GlucoseEntryUi
+    └── viewmodel/           — GlucoseViewModel + GlucoseState + GlucoseListEntryUi + GlucoseDetailViewModel + GlucoseEntryUi
 ```
 
 ### Data layer
@@ -50,7 +50,7 @@ Each type lives in its own file under `data/`:
 | File | Responsibility |
 |---|---|
 | `GlucoseEntry.kt` | Room entity — stores `valueInMmol` as the canonical unit, plus `timestamp` |
-| `GlucoseDao.kt` | `insert`, `delete`, `deleteAll`, `getAllEntries` (PagingSource), `getAverageValue` (Flow) |
+| `GlucoseDao.kt` | `insert`, `delete`, `deleteById`, `deleteAll`, `getAllEntries` (PagingSource), `getAverageValue` (Flow) |
 | `GlucoseDatabase.kt` | Room database singleton with SQLCipher encryption via `SupportOpenHelperFactory` |
 | `PassphraseManager.kt` | Generates, encrypts and persists the DB passphrase via Android Keystore |
 
@@ -82,12 +82,26 @@ Each type lives in its own file under `data/`:
 ### ViewModel layer
 
 `GlucoseViewModel` consumes `IGlucoseService` (injected via Koin constructor injection) to handle business logic like unit conversion and status determination. It exposes:
-- `glucoseState: StateFlow<GlucoseState>` — combines `average + unit` from Room/`_unit` only. **Never triggered by keystrokes.**
-- `glucoseEntries: Flow<PagingData<GlucoseEntry>>` — Paging 3 flow for list items, cached in `viewModelScope`.
+- `glucoseState: StateFlow<GlucoseState>` — combines `average + unit + status` from Room/`_unit` only. **Never triggered by keystrokes.**
+- `glucoseEntries: Flow<PagingData<GlucoseListEntryUi>>` — Paging 3 flow of pre-mapped list items; uses `flatMapLatest` on `_unit` so every unit change re-maps all loaded pages with the new `convertedValue`, then `cachedIn(viewModelScope)`.
 - `inputValue: StateFlow<String>` — separate flow for the text field value
 - `displayErrorMessage: StateFlow<Boolean>` — set to `true` when `saveEntry()` fails validation, reset to `false` on any input change or successful save
 
 **Key design decision:** `inputValue` and `displayErrorMessage` are kept outside the `combine()` operator so that typing in the input field never triggers a Room query emission or recomposes the entries list. Each `StateFlow` is collected independently in the screen.
+
+`GlucoseListEntryUi` is the UI model for each history list item, pre-computing all display values so the composable reads plain properties with no function calls:
+
+| Property | Description |
+|---|---|
+| `id` | Primary key (used for navigation to detail and delete) |
+| `valueInMmol` | Raw mmol/L value (canonical storage unit) |
+| `convertedValue` | Value converted to `unit` for display (via `IGlucoseService.fromMmol`) |
+| `status` | `BloodGlucoseStatus` classification (via `IGlucoseService.getGlucoseStatus`) |
+| `timestamp` | Unix epoch milliseconds for date formatting in the list item |
+| `unit` | The unit that `convertedValue` is expressed in |
+
+`GlucoseState` now also carries:
+- `status: BloodGlucoseStatus` — computed from `average` and `unit` inside the `combine` operator; the screen reads it as a plain property without any ViewModel function call
 
 #### GlucoseDetailViewModel
 
@@ -143,7 +157,7 @@ LogbookList ──(tap entry)──► GlucoseDetail
 
 - **`InputSection`** — receives individual slices (`inputValue`, `unit`, `errorMessage`) and stable lambda references; only recomposes when its own data changes
 - **`SummarySection`** — receives `average`, `unit`, and an already-computed `status: BloodGlucoseStatus`; purely declarative with no ViewModel dependency — previewable in isolation
-- **`HistorySection`** — receives `onConvertValue` and `onGetStatus` lambdas instead of the ViewModel; `LazyColumn` with `SwipeToDismissBox` per item; auto-scrolls to the top when a new entry is added
+- **`HistorySection`** — receives `LazyPagingItems<GlucoseListEntryUi>` directly; reads `convertedValue`, `unit`, `status` and `timestamp` as plain properties from each item — no lambda calls or `remember` wrappers needed per item; `LazyColumn` with `SwipeToDismissBox` per item; auto-scrolls to the top when a new entry is added
 
 All three private composables follow **state hoisting**: they receive only the data and lambdas they need, making them independently testable and previewable without a real ViewModel.
 
@@ -169,9 +183,8 @@ While the entry is loading (`entry == null`) a centred `CircularProgressIndicato
 | Technique | Where | Why |
 |---|---|---|
 | `remember`-wrapped `onDeleteRequest` lambda | `MiniLogbookScreen` | The lambda captures coroutine scope and snackbar state; wrapping it in `remember` gives it a stable reference so `HistorySection` skips recomposition when nothing else changed |
-| `remember`-wrapped `onConvertValue` / `onGetStatus` lambdas | `MiniLogbookScreen` | Wrapping ViewModel method references in `remember` (no keys) produces stable function references; `HistorySection` receives the same instance across recompositions and is never recomposed unnecessarily |
-| `remember(average, unit)` for `summaryStatus` | `MiniLogbookScreen` | Status is derived once at the screen level and passed down as a plain value; `SummarySection` is fully declarative and skips recomposition unless `average` or `unit` actually change |
-| `remember(entry.valueInMmol, unit)` / `remember(convertedValue, unit)` per item | `HistorySection` `LazyColumn` items | Conversion and status classification are pure functions — memoised per item so they only re-run when their specific inputs change, not on every list recomposition |
+| `remember(average, unit)` for `summaryStatus` eliminated — `status` now lives in `GlucoseState` | `MiniLogbookScreen` → `GlucoseViewModel` | Status is computed once inside `combine()` and delivered as a plain property; no per-recomposition derivation needed in the screen |
+| `PagingData<GlucoseListEntryUi>` pre-mapped in ViewModel | `GlucoseViewModel` / `HistorySection` | `convertedValue` and `status` per item are computed once in the ViewModel when the page is loaded or the unit changes; composables read stable values directly — eliminates the `remember(entry.valueInMmol, unit)` / `remember(convertedValue, unit)` wrappers that were needed per item |
 | `derivedStateOf` for `isDismissed` | Each `SwipeToDismissBox` item | Converts continuous `dismissState.currentValue` reads into a boolean that only invalidates downstream computations when the settled state actually flips |
 | `snapshotFlow + filter` instead of `LaunchedEffect(currentValue)` | `HistorySection` item | Fires only once when the swipe fully settles to `EndToStart`, not on every drag-offset change |
 | `Animatable + drawBehind` instead of `animateColorAsState` | `SwipeToDismissBox` background | Color animation runs entirely in the draw phase — zero recompositions per frame during the swipe |
@@ -181,10 +194,10 @@ While the entry is loading (`entry == null`) a centred `CircularProgressIndicato
 ### Swipe-to-delete + Undo
 
 The delete flow is designed to avoid full-screen recomposition:
-1. Each item's `LaunchedEffect` (via `snapshotFlow`) calls `onDeleteRequest` with a `Pair<GlucoseEntry, suspend () -> Unit>` — the lambda captures `dismissState::reset` so the item can animate back without any state hoisting
+1. Each item's `LaunchedEffect` (via `snapshotFlow`) calls `onDeleteRequest` with a `Pair<GlucoseListEntryUi, suspend () -> Unit>` — the lambda captures `dismissState::reset` so the item can animate back without any state hoisting
 2. `onDeleteRequest` (held at screen scope) launches a coroutine that shows the Snackbar
 3. On **Undo**: `dismissState.reset()` is called via the captured lambda — the item animates back
-4. On **dismiss**: `deleteEntry()` is called directly from the snackbar result handler
+4. On **dismiss**: `deleteEntry(entry)` is called with the `GlucoseListEntryUi`; the ViewModel uses `entry.id` to call `GlucoseDao.deleteById`
 
 ### Database encryption
 
@@ -229,7 +242,7 @@ GlucoseDetailViewModel (viewModel) — SavedStateHandle injected automatically b
 | Test class | Coverage |
 |---|---|
 | `GlucoseServiceTest` | Validation, mmol↔mg/dL conversion, status thresholds for both units |
-| `GlucoseViewModelTest` | Input value updates, error on invalid/negative save, successful save clears input, unit conversion of input value, average calculation, `isLoading` lifecycle |
+| `GlucoseViewModelTest` | Input value updates, error on invalid/negative save, successful save clears input, unit conversion of input value, average calculation, `isLoading` lifecycle, `status` in `GlucoseState` computed via `getGlucoseStatusByUnit`, `deleteEntry` delegates to `glucoseDao.deleteById` with the correct id |
 | `GlucoseDetailViewModelTest` | `SavedStateHandle` guard, `entry` emits `null` initially and when DAO returns null, mapping of `GlucoseEntry` → `GlucoseEntryUi` (id, valueInMmol, valueInMgdl via `fromMmol`, status via `getGlucoseStatus`, formattedDate), reactive updates on successive DAO emissions |
 
 ### Instrumented DAO tests (`src/androidTest`)
@@ -245,6 +258,9 @@ Run against an **in-memory SQLCipher database**:
 | `deleteSingleEntry_listBecomesEmptyWhenOnlyOneEntry` | Deleting the only entry results in empty list |
 | `deleteEntry_doesNotAffectOtherEntries` | Deleting middle entry preserves order of remaining |
 | `deleteNonExistentEntry_doesNothing` | Deleting an entry with an unknown id is a no-op |
+| `deleteById_removesCorrectEntry` | `deleteById(id)` removes exactly the entry with that id |
+| `deleteById_nonExistentId_doesNothing` | `deleteById` with an unknown id is a no-op |
+| `deleteById_doesNotAffectOtherEntries` | `deleteById` on the middle entry preserves order of remaining entries |
 
 ### Instrumented PassphraseManager tests (`src/androidTest`) — `PassphraseManagerTest`
 
