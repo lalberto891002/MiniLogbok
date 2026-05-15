@@ -25,7 +25,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
@@ -33,14 +32,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
-import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.ui.components.GlucoseDetailCard
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import com.assessment.minilogbook.ui.viewmodel.GlucoseDetailViewModel
 import org.koin.androidx.compose.koinViewModel
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,25 +82,11 @@ fun GlucoseDetailScreen(
 
         val currentEntry = entry!!
 
-        // Compute values once
-        val mmolValue = currentEntry.valueInMmol
-        val mgdlValue = remember(mmolValue) { viewModel.convertValue(mmolValue, GlucoseUnit.MG_DL) }
-        val status = remember(mmolValue) { viewModel.getStatus(mmolValue) }
-        val statusColor = getColorForStatus(status)
+        val statusColor = getColorForStatus(currentEntry.status)
 
-        val formattedMmol = remember(mmolValue) {
-            String.format(Locale.US, "%.2f %s", mmolValue, "mmol/L")
-        }
-        val formattedMgdl = remember(mgdlValue) {
-            String.format(Locale.US, "%.1f %s", mgdlValue, "mg/dL")
-        }
-        val formattedDate = remember(currentEntry.timestamp) {
-            DateTimeFormatter
-                .ofPattern("EEEE, MMM dd yyyy  •  HH:mm", Locale.getDefault())
-                .withZone(ZoneId.systemDefault())
-                .format(Instant.ofEpochMilli(currentEntry.timestamp))
-        }
-        val statusLabel = when (status) {
+        val formattedMmol = String.format(Locale.US, "%.2f %s", currentEntry.valueInMmol, "mmol/L")
+        val formattedMgdl = String.format(Locale.US, "%.1f %s", currentEntry.valueInMgdl, "mg/dL")
+        val statusLabel = when (currentEntry.status) {
             BloodGlucoseStatus.IN_TARGET -> stringResource(R.string.status_in_target)
             BloodGlucoseStatus.OK -> stringResource(R.string.status_ok)
             BloodGlucoseStatus.OUT_OF_RANGE -> stringResource(R.string.status_out_of_range)
@@ -138,7 +119,7 @@ fun GlucoseDetailScreen(
             // Date & time
             GlucoseDetailCard(
                 label = stringResource(R.string.label_date_time),
-                value = formattedDate,
+                value = currentEntry.formattedDate,
                 color = MaterialTheme.colorScheme.onSurface,
                 icon = Icons.Filled.DateRange
             )

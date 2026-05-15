@@ -91,11 +91,13 @@ class GlucoseDetailViewModelTest {
     }
 
     @Test
-    fun `entry emits GlucoseEntry when dao returns one`() = runTest {
+    fun `entry emits GlucoseEntryUi when dao returns a GlucoseEntry`() = runTest {
         val fakeEntry = GlucoseEntry(id = ENTRY_ID, valueInMmol = 5.5)
+        val expectedMgdl = 5.5 * GlucoseService.CONVERSION_FACTOR
         whenever(glucoseDao.getEntryById(ENTRY_ID)).thenReturn(flowOf(fakeEntry))
+        whenever(glucoseService.fromMmol(eq(5.5), eq(GlucoseUnit.MG_DL))).thenReturn(expectedMgdl)
+        whenever(glucoseService.getGlucoseStatus(eq(5.5))).thenReturn(BloodGlucoseStatus.IN_TARGET)
 
-        // Re-create the ViewModel so it picks up the new stub
         viewModel = GlucoseDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("entryId" to ENTRY_ID)),
             glucoseDao = glucoseDao,
@@ -105,7 +107,11 @@ class GlucoseDetailViewModelTest {
         val job = collectEntry()
         advanceUntilIdle()
 
-        assertEquals(fakeEntry, viewModel.entry.first())
+        val ui = viewModel.entry.first()
+        assertEquals(ENTRY_ID, ui?.id)
+        assertEquals(5.5, ui?.valueInMmol)
+        assertEquals(expectedMgdl, ui?.valueInMgdl)
+        assertEquals(BloodGlucoseStatus.IN_TARGET, ui?.status)
 
         job.cancel()
     }
@@ -146,92 +152,82 @@ class GlucoseDetailViewModelTest {
         assertNull(viewModel.entry.value)
 
         val fakeEntry = GlucoseEntry(id = ENTRY_ID, valueInMmol = 7.0)
+        whenever(glucoseService.fromMmol(eq(7.0), eq(GlucoseUnit.MG_DL))).thenReturn(7.0 * GlucoseService.CONVERSION_FACTOR)
+        whenever(glucoseService.getGlucoseStatus(eq(7.0))).thenReturn(BloodGlucoseStatus.IN_TARGET)
         flow.emit(fakeEntry)
         advanceUntilIdle()
-        assertEquals(fakeEntry, viewModel.entry.value)
+        assertEquals(ENTRY_ID, viewModel.entry.value?.id)
+        assertEquals(7.0, viewModel.entry.value?.valueInMmol)
 
         job.cancel()
     }
 
-    // ── convertValue ──────────────────────────────────────────────────────────
+    // ── mapping: valueInMgdl and status ──────────────────────────────────────
 
     @Test
-    fun `convertValue delegates to glucoseService fromMmol with MMOL_L`() {
+    fun `entry maps valueInMgdl using glucoseService fromMmol`() = runTest {
         val valueInMmol = 5.5
-        whenever(glucoseService.fromMmol(eq(valueInMmol), eq(GlucoseUnit.MMOL_L))).thenReturn(5.5)
-
-        val result = viewModel.convertValue(valueInMmol, GlucoseUnit.MMOL_L)
-
-        assertEquals(5.5, result, 0.0001)
-        verify(glucoseService).fromMmol(eq(valueInMmol), eq(GlucoseUnit.MMOL_L))
-    }
-
-    @Test
-    fun `convertValue delegates to glucoseService fromMmol with MG_DL`() {
-        val valueInMmol = 5.5
-        val expectedMgDl = 5.5 * GlucoseService.CONVERSION_FACTOR
-        whenever(glucoseService.fromMmol(eq(valueInMmol), eq(GlucoseUnit.MG_DL))).thenReturn(expectedMgDl)
-
-        val result = viewModel.convertValue(valueInMmol, GlucoseUnit.MG_DL)
-
-        assertEquals(expectedMgDl, result, 0.01)
-        verify(glucoseService).fromMmol(eq(valueInMmol), eq(GlucoseUnit.MG_DL))
-    }
-
-    @Test
-    fun `convertValue returns 0 for zero mmol value`() {
-        whenever(glucoseService.fromMmol(eq(0.0), eq(GlucoseUnit.MMOL_L))).thenReturn(0.0)
-
-        val result = viewModel.convertValue(0.0, GlucoseUnit.MMOL_L)
-
-        assertEquals(0.0, result, 0.0001)
-        verify(glucoseService).fromMmol(eq(0.0), eq(GlucoseUnit.MMOL_L))
-    }
-
-    // ── getStatus ─────────────────────────────────────────────────────────────
-
-    @Test
-    fun `getStatus returns IN_TARGET for value in target range`() {
-        val valueInMmol = 100.0 / GlucoseService.CONVERSION_FACTOR
+        val expectedMgdl = valueInMmol * GlucoseService.CONVERSION_FACTOR
+        whenever(glucoseDao.getEntryById(ENTRY_ID)).thenReturn(flowOf(GlucoseEntry(id = ENTRY_ID, valueInMmol = valueInMmol)))
+        whenever(glucoseService.fromMmol(eq(valueInMmol), eq(GlucoseUnit.MG_DL))).thenReturn(expectedMgdl)
         whenever(glucoseService.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.IN_TARGET)
 
-        val result = viewModel.getStatus(valueInMmol)
+        viewModel = GlucoseDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("entryId" to ENTRY_ID)),
+            glucoseDao = glucoseDao,
+            glucoseService = glucoseService
+        )
 
-        assertEquals(BloodGlucoseStatus.IN_TARGET, result)
-        verify(glucoseService).getGlucoseStatus(eq(valueInMmol))
+        val job = collectEntry()
+        advanceUntilIdle()
+
+        assertEquals(expectedMgdl, viewModel.entry.value?.valueInMgdl)
+        verify(glucoseService).fromMmol(eq(valueInMmol), eq(GlucoseUnit.MG_DL))
+
+        job.cancel()
     }
 
     @Test
-    fun `getStatus returns OK for value in ok range`() {
+    fun `entry maps status using glucoseService getGlucoseStatus`() = runTest {
         val valueInMmol = 160.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(glucoseDao.getEntryById(ENTRY_ID)).thenReturn(flowOf(GlucoseEntry(id = ENTRY_ID, valueInMmol = valueInMmol)))
+        whenever(glucoseService.fromMmol(any(), any())).thenReturn(0.0)
         whenever(glucoseService.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.OK)
 
-        val result = viewModel.getStatus(valueInMmol)
+        viewModel = GlucoseDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("entryId" to ENTRY_ID)),
+            glucoseDao = glucoseDao,
+            glucoseService = glucoseService
+        )
 
-        assertEquals(BloodGlucoseStatus.OK, result)
+        val job = collectEntry()
+        advanceUntilIdle()
+
+        assertEquals(BloodGlucoseStatus.OK, viewModel.entry.value?.status)
         verify(glucoseService).getGlucoseStatus(eq(valueInMmol))
+
+        job.cancel()
     }
 
     @Test
-    fun `getStatus returns OUT_OF_RANGE for critically high value`() {
+    fun `entry maps status OUT_OF_RANGE for critically high value`() = runTest {
         val valueInMmol = 200.0 / GlucoseService.CONVERSION_FACTOR
+        whenever(glucoseDao.getEntryById(ENTRY_ID)).thenReturn(flowOf(GlucoseEntry(id = ENTRY_ID, valueInMmol = valueInMmol)))
+        whenever(glucoseService.fromMmol(any(), any())).thenReturn(0.0)
         whenever(glucoseService.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.OUT_OF_RANGE)
 
-        val result = viewModel.getStatus(valueInMmol)
+        viewModel = GlucoseDetailViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("entryId" to ENTRY_ID)),
+            glucoseDao = glucoseDao,
+            glucoseService = glucoseService
+        )
 
-        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, result)
-        verify(glucoseService).getGlucoseStatus(eq(valueInMmol))
-    }
+        val job = collectEntry()
+        advanceUntilIdle()
 
-    @Test
-    fun `getStatus returns OUT_OF_RANGE for critically low value`() {
-        val valueInMmol = 50.0 / GlucoseService.CONVERSION_FACTOR
-        whenever(glucoseService.getGlucoseStatus(eq(valueInMmol))).thenReturn(BloodGlucoseStatus.OUT_OF_RANGE)
+        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, viewModel.entry.value?.status)
 
-        val result = viewModel.getStatus(valueInMmol)
-
-        assertEquals(BloodGlucoseStatus.OUT_OF_RANGE, result)
-        verify(glucoseService).getGlucoseStatus(eq(valueInMmol))
+        job.cancel()
     }
 }
 

@@ -40,7 +40,7 @@ app/
     ├── screen/              — MiniLogbookScreen, GlucoseDetailScreen + section composables
     ├── theme/               — Material3 theme, colours, typography
     ├── util/                — Status → colour mapper
-    └── viewmodel/           — GlucoseViewModel + GlucoseState + GlucoseDetailViewModel
+    └── viewmodel/           — GlucoseViewModel + GlucoseState + GlucoseDetailViewModel + GlucoseEntryUi
 ```
 
 ### Data layer
@@ -91,10 +91,18 @@ Each type lives in its own file under `data/`:
 
 #### GlucoseDetailViewModel
 
-`GlucoseDetailViewModel` is scoped to the `GlucoseDetail` destination and obtains the entry id from its `SavedStateHandle` (populated automatically by Navigation Compose). It exposes:
-- `entry: StateFlow<GlucoseEntry?>` — single-entry flow from `GlucoseDao.getEntryById(entryId)`, emits `null` while loading or if the entry is not found
-- `convertValue(valueInMmol, toUnit)` — delegates to `IGlucoseService.fromMmol`
-- `getStatus(valueInMmol)` — delegates to `IGlucoseService.getGlucoseStatus`
+`GlucoseDetailViewModel` is scoped to the `GlucoseDetail` destination and obtains the entry id from its `SavedStateHandle` (populated automatically by Navigation Compose). It maps the raw `GlucoseEntry` from the DAO into a `GlucoseEntryUi` model, keeping all derived computations out of the UI layer. It exposes:
+- `entry: StateFlow<GlucoseEntryUi?>` — single-entry flow mapped from `GlucoseDao.getEntryById(entryId)`; emits `null` while loading or if the entry is not found
+
+`GlucoseEntryUi` is the UI model produced by the mapping:
+
+| Property | Description |
+|---|---|
+| `id` | Primary key of the entry |
+| `formattedDate` | Pre-formatted date/time string (`EEEE, MMM dd yyyy  •  HH:mm`) |
+| `valueInMmol` | Glucose value in mmol/L |
+| `valueInMgdl` | Glucose value converted to mg/dL (via `IGlucoseService.fromMmol`) |
+| `status` | `BloodGlucoseStatus` classification (via `IGlucoseService.getGlucoseStatus`) |
 
 ### Navigation layer
 
@@ -150,7 +158,7 @@ All three private composables follow **state hoisting**: they receive only the d
 | Date & time | Full weekday + date + time (`EEEE, MMM dd yyyy  •  HH:mm`) | DateRange |
 | Status | `In target` / `Ok` / `Out of range`, colour-coded | Info |
 
-While the entry is loading (`entry == null`) a centred `CircularProgressIndicator` is shown. All derived values (`mgdlValue`, `status`, `formattedMmol`, `formattedMgdl`, `formattedDate`) are wrapped in `remember(key)` to avoid redundant recalculations on recomposition. The screen's `TopAppBar` provides a back-navigation arrow that calls `onNavigateBack`.
+While the entry is loading (`entry == null`) a centred `CircularProgressIndicator` is shown. Because all derived values (`valueInMgdl`, `status`, `formattedDate`) are pre-computed inside `GlucoseDetailViewModel` and exposed through `GlucoseEntryUi`, the screen reads them directly as plain properties — no `remember` wrappers or ViewModel function calls are needed in the composable. The screen's `TopAppBar` provides a back-navigation arrow that calls `onNavigateBack`.
 
 ---
 
@@ -222,6 +230,7 @@ GlucoseDetailViewModel (viewModel) — SavedStateHandle injected automatically b
 |---|---|
 | `GlucoseServiceTest` | Validation, mmol↔mg/dL conversion, status thresholds for both units |
 | `GlucoseViewModelTest` | Input value updates, error on invalid/negative save, successful save clears input, unit conversion of input value, average calculation, `isLoading` lifecycle |
+| `GlucoseDetailViewModelTest` | `SavedStateHandle` guard, `entry` emits `null` initially and when DAO returns null, mapping of `GlucoseEntry` → `GlucoseEntryUi` (id, valueInMmol, valueInMgdl via `fromMmol`, status via `getGlucoseStatus`, formattedDate), reactive updates on successive DAO emissions |
 
 ### Instrumented DAO tests (`src/androidTest`)
 
