@@ -11,9 +11,11 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.domain.model.GlucoseUnit
 import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
+import com.assessment.minilogbook.ui.theme.MiniLogbookTheme
 import com.assessment.minilogbook.ui.util.getColorForStatus
 import java.time.Instant
 import java.time.ZoneId
@@ -90,3 +92,32 @@ fun EntryItem(
         }
     }
 }
+
+@Preview(showBackground = true, name = "EntryItem – in target")
+@Composable
+private fun EntryItemInTargetPreview() {
+    MiniLogbookTheme {
+        EntryItem(
+            value = 5.40,
+            unit = GlucoseUnit.MMOL_L,
+            status = BloodGlucoseStatus.IN_TARGET,
+            timestamp = 1_715_000_000_000L,
+            onDelete = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "EntryItem – out of range")
+@Composable
+private fun EntryItemOutOfRangePreview() {
+    MiniLogbookTheme {
+        EntryItem(
+            value = 266.4,
+            unit = GlucoseUnit.MG_DL,
+            status = BloodGlucoseStatus.OUT_OF_RANGE,
+            timestamp = 1_715_003_600_000L,
+            onDelete = {}
+        )
+    }
+}
+

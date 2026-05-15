@@ -4,8 +4,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import com.assessment.minilogbook.R
 import com.assessment.minilogbook.domain.model.GlucoseUnit
+import com.assessment.minilogbook.ui.theme.MiniLogbookTheme
 
 /**
  * A segmented button row that lets the user switch between glucose units.
@@ -52,3 +54,18 @@ fun GlucoseUnitSelector(
     }
 }
 
+@Preview(showBackground = true, name = "GlucoseUnitSelector – mmol/L selected")
+@Composable
+private fun GlucoseUnitSelectorMmolPreview() {
+    MiniLogbookTheme {
+        GlucoseUnitSelector(selectedUnit = GlucoseUnit.MMOL_L, onUnitSelected = {})
+    }
+}
+
+@Preview(showBackground = true, name = "GlucoseUnitSelector – mg/dL selected")
+@Composable
+private fun GlucoseUnitSelectorMgdlPreview() {
+    MiniLogbookTheme {
+        GlucoseUnitSelector(selectedUnit = GlucoseUnit.MG_DL, onUnitSelected = {})
+    }
+}

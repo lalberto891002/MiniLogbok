@@ -1,10 +1,8 @@
 package com.assessment.minilogbook.ui.screen
 
-import androidx.compose.animation.Animatable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -12,10 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -24,55 +20,44 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.paging.compose.LazyPagingItems
+import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.assessment.minilogbook.R
-import com.assessment.minilogbook.data.GlucoseEntry
 import com.assessment.minilogbook.domain.model.GlucoseUnit
-import com.assessment.minilogbook.ui.components.EntryItem
-import com.assessment.minilogbook.ui.components.GlucoseInputField
-import com.assessment.minilogbook.ui.components.GlucoseUnitSelector
-import com.assessment.minilogbook.ui.components.StatusValueCard
-import com.assessment.minilogbook.domain.model.BloodGlucoseStatus
-import com.assessment.minilogbook.ui.util.getColorForStatus
+import com.assessment.minilogbook.ui.components.HistorySection
+import com.assessment.minilogbook.ui.components.InputSection
+import com.assessment.minilogbook.ui.components.SummarySection
+import com.assessment.minilogbook.ui.theme.MiniLogbookTheme
+import com.assessment.minilogbook.ui.viewmodel.GlucoseListEntryUi
 import com.assessment.minilogbook.ui.viewmodel.GlucoseViewModel
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
+fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick: (Int) -> Unit) {
     val glucoseState by viewModel.glucoseState.collectAsStateWithLifecycle()
     val inputValue by viewModel.inputValue.collectAsStateWithLifecycle()
     val displayErrorMessage by viewModel.displayErrorMessage.collectAsStateWithLifecycle()
@@ -98,7 +83,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
         keyboardController?.hide()
     }
 
-    val onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit =
+    val onDeleteRequest: (Pair<GlucoseListEntryUi, suspend () -> Unit>) -> Unit =
         remember {
             { (entry, resetDismiss) ->
                 coroutineScope.launch {
@@ -116,13 +101,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
             }
         }
 
-    val onConvertValue: (Double, GlucoseUnit) -> Double =
-        remember { { valueInMmol, toUnit -> viewModel.convertValue(valueInMmol, toUnit) } }
-
-    val onGetStatus: (Double, GlucoseUnit) -> BloodGlucoseStatus =
-        remember { { value, unit -> viewModel.getGlucoseStatusByUnit(value, unit) } }
-
-    val summaryStatus = remember(average, unit) { viewModel.getGlucoseStatusByUnit(average, unit) }
+    val summaryStatus = glucoseState.status
 
     val isExpanded = with(density) {
         windowInfo.containerSize.width.toDp() > 600.dp
@@ -137,6 +116,44 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
         snackbarHostState.currentSnackbarData?.dismiss()
     }
 
+    MiniLogbookScaffold(
+        snackbarHostState = snackbarHostState,
+        isLoading = isLoading,
+        isExpanded = isExpanded,
+        rotationKey = rotationKey,
+        unit = unit,
+        inputValue = inputValue,
+        displayErrorMessage = displayErrorMessage,
+        average = average,
+        summaryStatus = summaryStatus,
+        glucoseEntries = glucoseEntries,
+        onUnitSelected = onUnitSelected,
+        onValueChange = onValueChange,
+        onSave = onSave,
+        onDeleteRequest = onDeleteRequest,
+        onEntryClick = onEntryClick
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MiniLogbookScaffold(
+    snackbarHostState: SnackbarHostState,
+    isLoading: Boolean,
+    isExpanded: Boolean,
+    rotationKey: Int,
+    unit: GlucoseUnit,
+    inputValue: String,
+    displayErrorMessage: Boolean,
+    average: Double,
+    summaryStatus: com.assessment.minilogbook.domain.model.BloodGlucoseStatus,
+    glucoseEntries: androidx.paging.compose.LazyPagingItems<GlucoseListEntryUi>,
+    onUnitSelected: (GlucoseUnit) -> Unit,
+    onValueChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDeleteRequest: (Pair<GlucoseListEntryUi, suspend () -> Unit>) -> Unit,
+    onEntryClick: (Int) -> Unit
+) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -161,6 +178,7 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
             }
             return@Scaffold
         }
+
         if (isExpanded) {
             Row(
                 modifier = Modifier
@@ -194,9 +212,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
                     key(rotationKey) {
                         HistorySection(
                             pagedEntries = glucoseEntries,
-                            unit = unit,
-                            onConvertValue = onConvertValue,
-                            onGetStatus = onGetStatus,
                             onDeleteRequest = onDeleteRequest,
                             onEntryClick = onEntryClick
                         )
@@ -224,9 +239,6 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
                 key(rotationKey) {
                     HistorySection(
                         pagedEntries = glucoseEntries,
-                        unit = unit,
-                        onConvertValue = onConvertValue,
-                        onGetStatus = onGetStatus,
                         onDeleteRequest = onDeleteRequest,
                         onEntryClick = onEntryClick
                     )
@@ -236,156 +248,58 @@ fun MiniLogbookScreen(viewModel: GlucoseViewModel, onEntryClick:(Int) -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Preview(showBackground = true, name = "MiniLogbookScreen – loading")
 @Composable
-private fun InputSection(
-    unit: GlucoseUnit,
-    inputValue: String,
-    displayErrorMessage: Boolean,
-    onUnitSelected: (GlucoseUnit) -> Unit,
-    onValueChange: (String) -> Unit,
-    onSave: () -> Unit
-) {
-    val unitText = if (unit == GlucoseUnit.MMOL_L)
-        stringResource(R.string.unit_mmol_l)
-    else
-        stringResource(R.string.unit_mg_dl)
-
-    GlucoseUnitSelector(
-        selectedUnit = unit,
-        onUnitSelected = onUnitSelected,
-        modifier = Modifier.fillMaxWidth()
-    )
-
-    GlucoseInputField(
-        modifier = Modifier.fillMaxWidth(),
-        value = inputValue,
-        onValueChange = onValueChange,
-        unitText = unitText,
-        onDone = onSave,
-        errorMessage = if (displayErrorMessage) stringResource(R.string.error_invalid_value) else null
-    )
-
-    Button(
-        onClick = onSave,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(stringResource(R.string.action_save))
+private fun MiniLogbookLoadingPreview() {
+    MiniLogbookTheme {
+        val snackbarHostState = remember { SnackbarHostState() }
+        val emptyPaging = flowOf(PagingData.from(emptyList<GlucoseListEntryUi>())).collectAsLazyPagingItems()
+        MiniLogbookScaffold(
+            snackbarHostState = snackbarHostState,
+            isLoading = true,
+            isExpanded = false,
+            rotationKey = 0,
+            unit = GlucoseUnit.MMOL_L,
+            inputValue = "",
+            displayErrorMessage = false,
+            average = 0.0,
+            summaryStatus = com.assessment.minilogbook.domain.model.BloodGlucoseStatus.IN_TARGET,
+            glucoseEntries = emptyPaging,
+            onUnitSelected = {},
+            onValueChange = {},
+            onSave = {},
+            onDeleteRequest = {},
+            onEntryClick = {}
+        )
     }
 }
 
+@Preview(showBackground = true, name = "MiniLogbookScreen – content")
 @Composable
-private fun SummarySection(average: Double, unit: GlucoseUnit, status: BloodGlucoseStatus) {
-    val unitLabel =
-        if (unit == GlucoseUnit.MMOL_L) stringResource(R.string.unit_mmol_l) else stringResource(R.string.unit_mg_dl)
-
-    StatusValueCard(
-        modifier = Modifier.fillMaxWidth(),
-        label = stringResource(R.string.label_average_bg),
-        value = "${String.format(Locale.getDefault(), "%.2f", average)} $unitLabel",
-        color = getColorForStatus(status)
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HistorySection(
-    pagedEntries: LazyPagingItems<GlucoseEntry>,
-    unit: GlucoseUnit,
-    onConvertValue: (Double, GlucoseUnit) -> Double,
-    onGetStatus: (Double, GlucoseUnit) -> BloodGlucoseStatus,
-    onDeleteRequest: (Pair<GlucoseEntry, suspend () -> Unit>) -> Unit,
-    onEntryClick : (Int) -> Unit,
-    listState: LazyListState = rememberLazyListState()
-) {
-    Text(
-        stringResource(R.string.label_previous_entries),
-        style = MaterialTheme.typography.titleLarge
-    )
-
-    val coroutineScope = rememberCoroutineScope()
-
-    var previousCount by rememberSaveable { mutableIntStateOf(0) }
-    val itemCount = pagedEntries.itemCount
-
-    LaunchedEffect(itemCount) {
-        // Only auto-scroll when exactly one new item was inserted (not during bulk initial page loads).
-        if (itemCount == previousCount + 1 && listState.firstVisibleItemIndex > 0) {
-            listState.animateScrollToItem(0)
-        }
-        previousCount = itemCount
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.padding_small)),
-        contentPadding = PaddingValues(bottom = dimensionResource(R.dimen.padding_medium))
-    ) {
-        items(
-            count = pagedEntries.itemCount,
-            key = { index -> pagedEntries.peek(index)?.id ?: index }
-        ) { index ->
-            val entry = pagedEntries[index] ?: return@items
-
-            val convertedValue = remember(entry.valueInMmol, unit) {
-                onConvertValue(entry.valueInMmol, unit)
-            }
-
-            val status = remember(convertedValue, unit) {
-                onGetStatus(convertedValue, unit)
-            }
-
-            val dismissState = rememberSwipeToDismissBoxState()
-            val isDismissed by remember {
-                derivedStateOf { dismissState.currentValue == SwipeToDismissBoxValue.EndToStart }
-            }
-
-            LaunchedEffect(dismissState) {
-                snapshotFlow { dismissState.currentValue }
-                    .filter { it == SwipeToDismissBoxValue.EndToStart }
-                    .collect {
-                        onDeleteRequest(entry to dismissState::reset)
-                    }
-            }
-
-            SwipeToDismissBox(
-                state = dismissState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .animateItem(),
-                enableDismissFromStartToEnd = false,
-                backgroundContent = {
-                    val errorColor = MaterialTheme.colorScheme.errorContainer
-                    val surfaceColor = MaterialTheme.colorScheme.surface
-                    val animatable = remember(surfaceColor) { Animatable(surfaceColor) }
-
-                    LaunchedEffect(isDismissed) {
-                        animatable.animateTo(if (isDismissed) errorColor else surfaceColor)
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(MaterialTheme.shapes.medium)
-                            .drawBehind { drawRect(animatable.value) }
-                    )
-                }
-            ) {
-                EntryItem(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = convertedValue,
-                    unit = unit,
-                    status = status,
-                    timestamp = entry.timestamp,
-                    onClick = { onEntryClick(entry.id) },
-                    onDelete = {
-                        coroutineScope.launch {
-                            dismissState.dismiss(SwipeToDismissBoxValue.EndToStart)
-                        }
-                    }
-                )
-            }
-        }
+private fun MiniLogbookContentPreview() {
+    MiniLogbookTheme {
+        val snackbarHostState = remember { SnackbarHostState() }
+        val fakeItems = listOf(
+            GlucoseListEntryUi(1, 5.4, 5.4, com.assessment.minilogbook.domain.model.BloodGlucoseStatus.IN_TARGET, 1_715_000_000_000L, GlucoseUnit.MMOL_L),
+            GlucoseListEntryUi(2, 7.8, 7.8, com.assessment.minilogbook.domain.model.BloodGlucoseStatus.OK, 1_715_003_600_000L, GlucoseUnit.MMOL_L)
+        )
+        val pagingItems = flowOf(PagingData.from(fakeItems)).collectAsLazyPagingItems()
+        MiniLogbookScaffold(
+            snackbarHostState = snackbarHostState,
+            isLoading = false,
+            isExpanded = false,
+            rotationKey = 0,
+            unit = GlucoseUnit.MMOL_L,
+            inputValue = "5.4",
+            displayErrorMessage = false,
+            average = 5.4,
+            summaryStatus = com.assessment.minilogbook.domain.model.BloodGlucoseStatus.IN_TARGET,
+            glucoseEntries = pagingItems,
+            onUnitSelected = {},
+            onValueChange = {},
+            onSave = {},
+            onDeleteRequest = {},
+            onEntryClick = {}
+        )
     }
 }

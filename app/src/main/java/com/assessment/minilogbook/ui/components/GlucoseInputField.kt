@@ -18,8 +18,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import com.assessment.minilogbook.R
+import com.assessment.minilogbook.ui.theme.MiniLogbookTheme
 
 /**
  * A reusable input field for glucose values.
@@ -103,3 +105,26 @@ fun GlucoseInputField(
         )
     }
 }
+
+@Preview(showBackground = true, name = "GlucoseInputField – idle")
+@Composable
+private fun GlucoseInputFieldIdlePreview() {
+    MiniLogbookTheme {
+        GlucoseInputField(value = "5.4", onValueChange = {}, unitText = "mmol/L", onDone = {})
+    }
+}
+
+@Preview(showBackground = true, name = "GlucoseInputField – error")
+@Composable
+private fun GlucoseInputFieldErrorPreview() {
+    MiniLogbookTheme {
+        GlucoseInputField(
+            value = "999",
+            onValueChange = {},
+            unitText = "mg/dL",
+            onDone = {},
+            errorMessage = "Invalid value"
+        )
+    }
+}
+
