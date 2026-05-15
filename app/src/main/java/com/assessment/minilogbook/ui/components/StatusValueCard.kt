@@ -10,8 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.assessment.minilogbook.R
+import com.assessment.minilogbook.ui.theme.MiniLogbookTheme
 
 /**
  * A generic card that displays a labelled value with a colour-coded border and background.
@@ -54,3 +56,18 @@ fun StatusValueCard(
     }
 }
 
+@Preview(showBackground = true, name = "StatusValueCard – green")
+@Composable
+private fun StatusValueCardGreenPreview() {
+    MiniLogbookTheme {
+        StatusValueCard(label = "Average Blood Glucose", value = "5.40 mmol/L", color = Color(0xFF2E7D32))
+    }
+}
+
+@Preview(showBackground = true, name = "StatusValueCard – red")
+@Composable
+private fun StatusValueCardRedPreview() {
+    MiniLogbookTheme {
+        StatusValueCard(label = "Average Blood Glucose", value = "14.80 mmol/L", color = Color(0xFFB71C1C))
+    }
+}

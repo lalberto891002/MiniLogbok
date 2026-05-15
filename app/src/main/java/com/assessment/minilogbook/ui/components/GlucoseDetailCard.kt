@@ -21,8 +21,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.assessment.minilogbook.R
+import com.assessment.minilogbook.ui.theme.MiniLogbookTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 
 /**
  * A reusable card that displays a single labelled data field for a glucose entry detail.
@@ -82,3 +86,27 @@ fun GlucoseDetailCard(
     }
 }
 
+@Preview(showBackground = true, name = "GlucoseDetailCard – with icon")
+@Composable
+private fun GlucoseDetailCardWithIconPreview() {
+    MiniLogbookTheme {
+        GlucoseDetailCard(
+            label = "Glucose Value",
+            value = "5.40 mmol/L",
+            color = Color(0xFF2E7D32),
+            icon = Icons.Filled.Star
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "GlucoseDetailCard – no icon")
+@Composable
+private fun GlucoseDetailCardNoIconPreview() {
+    MiniLogbookTheme {
+        GlucoseDetailCard(
+            label = "Status",
+            value = "In Target",
+            color = Color(0xFF2E7D32)
+        )
+    }
+}
